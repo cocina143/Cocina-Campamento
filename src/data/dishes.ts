@@ -58,26 +58,15 @@ export const INITIAL_DISHES: Dish[] = [
   },
 ];
 
-// 1. OBTENER PLATOS E INGREDIENTES
+// 1. OBTENER PLATOS E INGREDIENTES DE SUPABASE
 export async function getDishesFromSupabase(): Promise<Dish[]> {
   const { data, error } = await supabase
     .from('dishes')
-    .select(`
-      id,
-      name,
-      category,
-      image,
-      dish_ingredients (
-        amount,
-        unit,
-        ingredientes (
-          name
-        )
-      )
-    `);
+    .select('*')
+    .order('name');
 
   if (error) {
-    console.error('❌ Error obteniendo platos de Supabase:', error);
+    console.error('Error cargando platos:', error);
     throw error;
   }
 
@@ -86,88 +75,51 @@ export async function getDishesFromSupabase(): Promise<Dish[]> {
     name: d.name,
     category: d.category,
     image: d.image,
-    ingredients: (d.dish_ingredients || []).map((di: any) => ({
-      name: di.ingredientes?.name || '',
-      amount: Number(di.amount),
-      unit: di.unit,
-    })),
+    ingredients: Array.isArray(d.ingredients) ? d.ingredients : [],
   }));
 }
 
-// 2. GUARDAR / ACTUALIZAR UN PLATO
+// 2. GUARDAR / ACTUALIZAR UN PLATO (EN 1 SOLA PETICIÓN HTTP)
 export async function saveDishToSupabase(dish: Dish): Promise<void> {
-  // A) Guardar en 'dishes'
-  const { error: dishError } = await supabase
+  const { error } = await supabase
     .from('dishes')
     .upsert({
       id: dish.id,
       name: dish.name,
       category: dish.category,
       image: dish.image,
+      ingredients: dish.ingredients, // Directo como array JSON
+      updated_at: new Date().toISOString(),
     });
 
-  if (dishError) {
-    console.error(`❌ Error guardando plato "${dish.name}":`, dishError);
-    throw dishError;
+  if (error) {
+    console.error(`Error guardando el plato "${dish.name}":`, error);
+    throw error;
   }
+}
 
-  // B) Limpiar ingredientes anteriores del plato
-  const { error: deleteErr } = await supabase
-    .from('dish_ingredients')
-    .delete()
-    .eq('dish_id', dish.id);
+// 3. HELPER: SUMAR INGREDIENTES PARA LISTA DE LA COMPRA
+export function calculateTotalIngredients(selectedDishes: Dish[], totalPeople: number = 1): Ingredient[] {
+  const totals: Record<string, { name: string; amount: number; unit: string }> = {};
 
-  if (deleteErr) {
-    console.error(`❌ Error borrando ingredientes antiguos de "${dish.name}":`, deleteErr);
-    throw deleteErr;
-  }
+  selectedDishes.forEach((dish) => {
+    (dish.ingredients || []).forEach((ing) => {
+      const cleanName = ing.name.trim();
+      if (!cleanName) return;
 
-  // C) Insertar/asociar ingredientes
-  for (const ing of dish.ingredients) {
-    const cleanName = ing.name ? ing.name.trim() : '';
-    if (!cleanName) continue;
+      const key = `${cleanName.toLowerCase()}_${ing.unit.toLowerCase()}`;
 
-    // 1. Buscar o insertar en 'ingredientes' usando UPSERT
-    let { data: existingIng, error: searchErr } = await supabase
-      .from('ingredientes')
-      .select('id')
-      .eq('name', cleanName)
-      .maybeSingle();
-
-    if (searchErr) {
-      console.error(`❌ Error buscando ingrediente "${cleanName}":`, searchErr);
-      throw searchErr;
-    }
-
-    let ingredienteId = existingIng?.id;
-
-    if (!ingredienteId) {
-      const { data: newIng, error: ingInsertErr } = await supabase
-        .from('ingredientes')
-        .upsert({ name: cleanName }, { onConflict: 'name' })
-        .select('id')
-        .single();
-
-      if (ingInsertErr) {
-        console.error(`❌ Error creando ingrediente "${cleanName}":`, ingInsertErr);
-        throw ingInsertErr;
+      if (totals[key]) {
+        totals[key].amount += Number(ing.amount) * totalPeople;
+      } else {
+        totals[key] = {
+          name: cleanName,
+          amount: Number(ing.amount) * totalPeople,
+          unit: ing.unit,
+        };
       }
-      ingredienteId = newIng.id;
-    }
+    });
+  });
 
-    // 2. Crear relación en 'dish_ingredients'
-    const { error: relError } = await supabase
-      .from('dish_ingredients')
-      .insert({
-        dish_id: dish.id,
-        ingrediente_id: ingredienteId,
-        amount: ing.amount,
-        unit: ing.unit,
-      });
-
-    if (relError) {
-      console.error(`❌ Error vinculando ingrediente "${cleanName}" con plato "${dish.name}":`, relError);
-      throw relError;
-    }
-  }
+  return Object.values(totals);
 }
