@@ -19,7 +19,7 @@ export const INITIAL_DISHES: Dish[] = [
     id: 'macarrones-bolonesa',
     name: 'Macarrones a la Boloñesa',
     category: 'Plato principal',
-    image: 'https://images.unsplash.com/photo-1621996346565-e3d5d6281290?auto=format&fit=crop&w=800&q=80',
+    image: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80',
     ingredients: [
       { name: 'Macarrones', amount: 100, unit: 'g' },
       { name: 'Carne picada mixta', amount: 80, unit: 'g' },
@@ -77,7 +77,7 @@ export async function getDishesFromSupabase(): Promise<Dish[]> {
     `);
 
   if (error) {
-    console.error('Error cargando platos de Supabase:', error);
+    console.error('❌ Error obteniendo platos de Supabase:', error);
     throw error;
   }
 
@@ -106,35 +106,52 @@ export async function saveDishToSupabase(dish: Dish): Promise<void> {
       image: dish.image,
     });
 
-  if (dishError) throw dishError;
+  if (dishError) {
+    console.error(`❌ Error guardando plato "${dish.name}":`, dishError);
+    throw dishError;
+  }
 
   // B) Limpiar ingredientes anteriores del plato
-  await supabase
+  const { error: deleteErr } = await supabase
     .from('dish_ingredients')
     .delete()
     .eq('dish_id', dish.id);
 
+  if (deleteErr) {
+    console.error(`❌ Error borrando ingredientes antiguos de "${dish.name}":`, deleteErr);
+    throw deleteErr;
+  }
+
   // C) Insertar/asociar ingredientes
   for (const ing of dish.ingredients) {
-    if (!ing.name || !ing.name.trim()) continue;
+    const cleanName = ing.name ? ing.name.trim() : '';
+    if (!cleanName) continue;
 
-    // 1. Buscar o insertar en 'ingredientes'
-    let { data: existingIng } = await supabase
+    // 1. Buscar o insertar en 'ingredientes' usando UPSERT
+    let { data: existingIng, error: searchErr } = await supabase
       .from('ingredientes')
       .select('id')
-      .eq('name', ing.name.trim())
+      .eq('name', cleanName)
       .maybeSingle();
+
+    if (searchErr) {
+      console.error(`❌ Error buscando ingrediente "${cleanName}":`, searchErr);
+      throw searchErr;
+    }
 
     let ingredienteId = existingIng?.id;
 
     if (!ingredienteId) {
       const { data: newIng, error: ingInsertErr } = await supabase
         .from('ingredientes')
-        .insert({ name: ing.name.trim() })
+        .upsert({ name: cleanName }, { onConflict: 'name' })
         .select('id')
         .single();
 
-      if (ingInsertErr) throw ingInsertErr;
+      if (ingInsertErr) {
+        console.error(`❌ Error creando ingrediente "${cleanName}":`, ingInsertErr);
+        throw ingInsertErr;
+      }
       ingredienteId = newIng.id;
     }
 
@@ -148,6 +165,9 @@ export async function saveDishToSupabase(dish: Dish): Promise<void> {
         unit: ing.unit,
       });
 
-    if (relError) throw relError;
+    if (relError) {
+      console.error(`❌ Error vinculando ingrediente "${cleanName}" con plato "${dish.name}":`, relError);
+      throw relError;
+    }
   }
 }
