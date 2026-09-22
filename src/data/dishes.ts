@@ -14,7 +14,6 @@ export interface Dish {
   ingredients: Ingredient[];
 }
 
-// Platos iniciales por defecto (exportado para App.tsx)
 export const INITIAL_DISHES: Dish[] = [
   {
     id: 'macarrones-bolonesa',
@@ -59,7 +58,7 @@ export const INITIAL_DISHES: Dish[] = [
   },
 ];
 
-// 1. OBTENER PLATOS E INGREDIENTES DE SUPABASE
+// 1. OBTENER PLATOS E INGREDIENTES
 export async function getDishesFromSupabase(): Promise<Dish[]> {
   const { data, error } = await supabase
     .from('dishes')
@@ -95,9 +94,9 @@ export async function getDishesFromSupabase(): Promise<Dish[]> {
   }));
 }
 
-// 2. GUARDAR / ACTUALIZAR UN PLATO Y SUS INGREDIENTES EN SUPABASE
+// 2. GUARDAR / ACTUALIZAR UN PLATO
 export async function saveDishToSupabase(dish: Dish): Promise<void> {
-  // A) Guardar en la tabla 'dishes'
+  // A) Guardar en 'dishes'
   const { error: dishError } = await supabase
     .from('dishes')
     .upsert({
@@ -109,17 +108,17 @@ export async function saveDishToSupabase(dish: Dish): Promise<void> {
 
   if (dishError) throw dishError;
 
-  // B) Limpiar ingredientes anteriores de este plato
+  // B) Limpiar ingredientes anteriores del plato
   await supabase
     .from('dish_ingredients')
     .delete()
     .eq('dish_id', dish.id);
 
-  // C) Insertar/asociar nuevos ingredientes
+  // C) Insertar/asociar ingredientes
   for (const ing of dish.ingredients) {
     if (!ing.name || !ing.name.trim()) continue;
 
-    // 1. Obtener o crear ingrediente en la tabla 'ingredientes'
+    // 1. Buscar o insertar en 'ingredientes'
     let { data: existingIng } = await supabase
       .from('ingredientes')
       .select('id')
