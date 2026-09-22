@@ -1,6 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { INITIAL_DISHES } from '@/data/dishes';
+import { 
+  INITIAL_DISHES, 
+  getDishesFromSupabase, 
+  saveDishToSupabase, 
+  type Dish 
+} from '@/data/dishes';
 import { INITIAL_MENU, type DayMenu } from '@/data/menu';
 import { DishCard } from '@/components/DishCard';
 import { DishModal } from '@/components/DishModal';
@@ -11,7 +16,6 @@ import { SectionPanel } from '@/components/SectionPanel';
 import type { SectionCounts } from '@/data/sections';
 import { DEFAULT_COUNTS, totalPeople, SECTIONS } from '@/data/sections';
 import { Flame, CheckCircle2, ChefHat, Users, Settings, Utensils, Calendar, Wifi, WifiOff } from 'lucide-react';
-import type { Dish } from '@/data/dishes';
 
 type FilterCategory = 'Todos' | 'Plato principal' | 'Especial';
 
@@ -88,19 +92,25 @@ export default function App() {
     }
   });
 
-  // Carga inicial e integración en tiempo real con Supabase
+  // Carga inicial usando getDishesFromSupabase (3 tablas relacionales)
   useEffect(() => {
     async function fetchRemoteDishes() {
       try {
-        const { data, error } = await supabase.from('dishes').select('*');
-        if (!error && data && data.length > 0) {
-          setDishesList(data as Dish[]);
-          localStorage.setItem(DISHES_KEY, JSON.stringify(data));
-        } else if (data && data.length === 0) {
-          await supabase.from('dishes').upsert(INITIAL_DISHES);
+        const remoteDishes = await getDishesFromSupabase();
+        if (remoteDishes && remoteDishes.length > 0) {
+          setDishesList(remoteDishes);
+          localStorage.setItem(DISHES_KEY, JSON.stringify(remoteDishes));
+          setIsSynced(true);
+        } else {
+          // Si Supabase está vacío, subir platos iniciales
+          for (const dish of INITIAL_DISHES) {
+            await saveDishToSupabase(dish);
+          }
+          setDishesList(INITIAL_DISHES);
+          setIsSynced(true);
         }
       } catch (err) {
-        console.warn('Modo Offline: usando platos locales', err);
+        console.warn('Modo Offline/Error platos:', err);
         setIsSynced(false);
       }
     }
@@ -118,11 +128,12 @@ export default function App() {
           }));
           setMenuList(formatted);
           localStorage.setItem(MENU_KEY, JSON.stringify(formatted));
+          setIsSynced(true);
         } else if (data && data.length === 0) {
           await supabase.from('menu').upsert(INITIAL_MENU);
         }
       } catch (err) {
-        console.warn('Modo Offline: usando menú local', err);
+        console.warn('Modo Offline/Error menú:', err);
         setIsSynced(false);
       }
     }
@@ -130,6 +141,7 @@ export default function App() {
     fetchRemoteDishes();
     fetchRemoteMenu();
 
+    // Suscripciones en tiempo real
     const dishesSubscription = supabase
       .channel('public:dishes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'dishes' }, () => {
@@ -160,11 +172,14 @@ export default function App() {
     try { localStorage.setItem(DATE_KEY, newDate); } catch { /* ignore */ }
   };
 
+  // Guardado de platos usando saveDishToSupabase
   const handleSaveDishes = async (newDishes: Dish[]) => {
     setDishesList(newDishes);
     try {
       localStorage.setItem(DISHES_KEY, JSON.stringify(newDishes));
-      await supabase.from('dishes').upsert(newDishes);
+      for (const dish of newDishes) {
+        await saveDishToSupabase(dish);
+      }
       setIsSynced(true);
     } catch (e) {
       console.warn('Error al sincronizar platos con la nube:', e);
@@ -184,24 +199,26 @@ export default function App() {
     }
   };
 
-  // Fuerza la subida directa de todo el almacenamiento local del dispositivo a Supabase
+  // Forzar subida de datos del móvil a Supabase
   const forceUploadToCloud = async () => {
     try {
       const localDishes = loadDishes();
       const localMenu = loadMenu();
 
       if (localDishes.length > 0) {
-        await supabase.from('dishes').upsert(localDishes);
+        for (const dish of localDishes) {
+          await saveDishToSupabase(dish);
+        }
       }
       if (localMenu.length > 0) {
         await supabase.from('menu').upsert(localMenu);
       }
 
       setIsSynced(true);
-      alert('¡Datos subidos a la nube con éxito! Ahora puedes abrir la app en el PC o recargar para ver todos tus platos.');
+      alert('¡Datos subidos a la nube con éxito! Se han sincronizado las 3 tablas de platos e ingredientes.');
     } catch (err) {
       console.error('Error al forzar la subida:', err);
-      alert('Error al conectar con la nube. Comprueba tu conexión a Internet.');
+      alert('Error al conectar con la nube. Comprueba tu conexión a Internet o los permisos.');
     }
   };
 
@@ -220,7 +237,7 @@ export default function App() {
     try { localStorage.removeItem(CHECKED_KEY); } catch { /* ignore */ }
   };
 
-  // Filtrado vinculado al Día Seleccionado y a la Categoría
+  // Filtrado de platos
   const filteredDishes = useMemo(() => {
     const currentDayMenu = menuList.find((m) => m.day === selectedCampDay);
     if (!currentDayMenu) return [];
@@ -235,14 +252,13 @@ export default function App() {
     return dishesList.filter((dish) => {
       const isPlannedForToday = activeDishIds.has(dish.id) || activeDishIds.has(dish.name);
       const matchesCategory = filter === 'Todos' || dish.category === filter;
-
       return isPlannedForToday && matchesCategory;
     });
   }, [selectedCampDay, menuList, dishesList, filter]);
 
-  const totalIngredients = filteredDishes.reduce((acc, d) => acc + d.ingredients.length, 0);
+  const totalIngredients = filteredDishes.reduce((acc, d) => acc + (d.ingredients?.length || 0), 0);
   const checkedCount = filteredDishes.reduce(
-    (acc, d) => acc + d.ingredients.filter((ing) => checkedIngredients.has(`${d.id}-${ing.name}`)).length,
+    (acc, d) => acc + (d.ingredients || []).filter((ing) => checkedIngredients.has(`${d.id}-${ing.name}`)).length,
     0,
   );
 
@@ -370,7 +386,7 @@ export default function App() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredDishes.map((dish) => {
-              const dishChecked = dish.ingredients.filter((ing) =>
+              const dishChecked = (dish.ingredients || []).filter((ing) =>
                 checkedIngredients.has(`${dish.id}-${ing.name}`),
               ).length;
               return (
@@ -399,7 +415,7 @@ export default function App() {
                 onClick={forceUploadToCloud}
                 className="px-3 py-1 bg-orange-100 hover:bg-orange-200 text-orange-800 text-xs font-bold rounded-lg transition-colors border border-orange-200 shadow-sm"
               >
-                ☁️ Subir datos del móvil a la Nube
+                ☁️ Subir recetas del móvil a la Nube
               </button>
 
               <span className="flex items-center gap-1.5 font-medium text-xs">
@@ -460,44 +476,3 @@ export default function App() {
     </div>
   );
 }
-// Función para migrar las recetas guardadas en el móvil hacia Supabase
-const syncMobileDishesToSupabase = async () => {
-  try {
-    // 1. Leer las recetas guardadas en el localStorage del navegador
-    const localData = localStorage.getItem('dishes'); // O el nombre de la clave que uses
-    if (!localData) {
-      alert('No se encontraron recetas guardadas localmente en este dispositivo.');
-      return;
-    }
-
-    const localDishes = JSON.parse(localData);
-
-    if (!Array.isArray(localDishes) || localDishes.length === 0) {
-      alert('No hay recetas para subir.');
-      return;
-    }
-
-    // 2. Subir/Insertar en Supabase (upsert evita duplicados si coinciden por ID)
-    const { data, error } = await supabase
-      .from('dishes')
-      .upsert(localDishes);
-
-    if (error) {
-      console.error('Error al subir a Supabase:', error);
-      alert('Error al subir las recetas a Supabase: ' + error.message);
-    } else {
-      alert(`¡Éxito! Se han subido ${localDishes.length} recetas a Supabase.`);
-      // Opcional: Recargar los datos desde Supabase
-      window.location.reload();
-    }
-  } catch (err) {
-    console.error(err);
-    alert('Ocurrió un error inesperado al sincronizar.');
-  }
-};
-<button 
-  onClick={syncMobileDishesToSupabase}
-  className="bg-green-600 text-white px-4 py-2 rounded-xl font-bold text-sm"
->
-  ☁️ Subir recetas del móvil a la Nube
-</button>
