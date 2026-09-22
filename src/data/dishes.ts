@@ -14,7 +14,52 @@ export interface Dish {
   ingredients: Ingredient[];
 }
 
-// 1. OBTENER PLATOS E INGREDIENTES
+// Platos iniciales por defecto (exportado para App.tsx)
+export const INITIAL_DISHES: Dish[] = [
+  {
+    id: 'macarrones-bolonesa',
+    name: 'Macarrones a la Boloñesa',
+    category: 'Plato principal',
+    image: 'https://images.unsplash.com/photo-1621996346565-e3d5d6281290?auto=format&fit=crop&w=800&q=80',
+    ingredients: [
+      { name: 'Macarrones', amount: 100, unit: 'g' },
+      { name: 'Carne picada mixta', amount: 80, unit: 'g' },
+      { name: 'Tomate frito', amount: 100, unit: 'g' },
+      { name: 'Cebolla', amount: 20, unit: 'g' },
+      { name: 'Queso rallado', amount: 15, unit: 'g' },
+      { name: 'Aceite de oliva', amount: 10, unit: 'ml' },
+    ],
+  },
+  {
+    id: 'lentejas-verduras',
+    name: 'Lentejas con Verduras',
+    category: 'Plato principal',
+    image: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=800&q=80',
+    ingredients: [
+      { name: 'Lentejas pardinas', amount: 80, unit: 'g' },
+      { name: 'Zanahoria', amount: 30, unit: 'g' },
+      { name: 'Patata', amount: 50, unit: 'g' },
+      { name: 'Cebolla', amount: 20, unit: 'g' },
+      { name: 'Pimiento verde', amount: 15, unit: 'g' },
+      { name: 'Chorizo', amount: 25, unit: 'g' },
+    ],
+  },
+  {
+    id: 'pollo-empanado',
+    name: 'Pollo Empanado con Patatas',
+    category: 'Plato principal',
+    image: 'https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=800&q=80',
+    ingredients: [
+      { name: 'Pechuga de pollo', amount: 150, unit: 'g' },
+      { name: 'Pan rallado', amount: 30, unit: 'g' },
+      { name: 'Huevo', amount: 0.5, unit: 'ud' },
+      { name: 'Patatas', amount: 150, unit: 'g' },
+      { name: 'Aceite para freír', amount: 30, unit: 'ml' },
+    ],
+  },
+];
+
+// 1. OBTENER PLATOS E INGREDIENTES DE SUPABASE
 export async function getDishesFromSupabase(): Promise<Dish[]> {
   const { data, error } = await supabase
     .from('dishes')
@@ -50,7 +95,7 @@ export async function getDishesFromSupabase(): Promise<Dish[]> {
   }));
 }
 
-// 2. GUARDAR / ACTUALIZAR UN PLATO Y SUS INGREDIENTES
+// 2. GUARDAR / ACTUALIZAR UN PLATO Y SUS INGREDIENTES EN SUPABASE
 export async function saveDishToSupabase(dish: Dish): Promise<void> {
   // A) Guardar en la tabla 'dishes'
   const { error: dishError } = await supabase
@@ -64,7 +109,7 @@ export async function saveDishToSupabase(dish: Dish): Promise<void> {
 
   if (dishError) throw dishError;
 
-  // B) Limpiar ingredientes anteriores de este plato para evitar duplicados
+  // B) Limpiar ingredientes anteriores de este plato
   await supabase
     .from('dish_ingredients')
     .delete()
