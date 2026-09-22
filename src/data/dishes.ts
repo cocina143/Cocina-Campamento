@@ -58,15 +58,15 @@ export const INITIAL_DISHES: Dish[] = [
   },
 ];
 
-// 1. OBTENER PLATOS E INGREDIENTES DE SUPABASE
+// 1. OBTENER PLATOS DE SUPABASE (Informatizado directo de JSONB)
 export async function getDishesFromSupabase(): Promise<Dish[]> {
   const { data, error } = await supabase
     .from('dishes')
-    .select('*')
+    .select('id, name, category, image, ingredients')
     .order('name');
 
   if (error) {
-    console.error('Error cargando platos:', error);
+    console.error('❌ Error obteniendo platos de Supabase:', error);
     throw error;
   }
 
@@ -75,12 +75,24 @@ export async function getDishesFromSupabase(): Promise<Dish[]> {
     name: d.name,
     category: d.category,
     image: d.image,
-    ingredients: Array.isArray(d.ingredients) ? d.ingredients : [],
+    // Nos aseguramos de parsear correctamente las cantidades como números
+    ingredients: (Array.isArray(d.ingredients) ? d.ingredients : []).map((ing: any) => ({
+      name: ing.name || '',
+      amount: Number(ing.amount) || 0,
+      unit: ing.unit || 'g',
+    })),
   }));
 }
 
-// 2. GUARDAR / ACTUALIZAR UN PLATO (EN 1 SOLA PETICIÓN HTTP)
+// 2. GUARDAR / ACTUALIZAR UN PLATO (Guarda el array JSONB intacto)
 export async function saveDishToSupabase(dish: Dish): Promise<void> {
+  // Limpiamos y aseguramos el formato numérico en cada ingrediente antes de enviar
+  const formattedIngredients = (dish.ingredients || []).map((ing) => ({
+    name: ing.name ? ing.name.trim() : '',
+    amount: Number(ing.amount) || 0, // Conversión garantizada a número
+    unit: ing.unit ? ing.unit.trim() : 'g',
+  })).filter((ing) => ing.name !== '');
+
   const { error } = await supabase
     .from('dishes')
     .upsert({
@@ -88,23 +100,22 @@ export async function saveDishToSupabase(dish: Dish): Promise<void> {
       name: dish.name,
       category: dish.category,
       image: dish.image,
-      ingredients: dish.ingredients, // Directo como array JSON
-      updated_at: new Date().toISOString(),
+      ingredients: formattedIngredients, // Guarda el array JSONB en la columna ingredients
     });
 
   if (error) {
-    console.error(`Error guardando el plato "${dish.name}":`, error);
+    console.error(`❌ Error guardando plato "${dish.name}":`, error);
     throw error;
   }
 }
 
-// 3. HELPER: SUMAR INGREDIENTES PARA LISTA DE LA COMPRA
+// 3. HELPER: CALCULAR TOTALES / LISTA DE LA COMPRA
 export function calculateTotalIngredients(selectedDishes: Dish[], totalPeople: number = 1): Ingredient[] {
   const totals: Record<string, { name: string; amount: number; unit: string }> = {};
 
   selectedDishes.forEach((dish) => {
     (dish.ingredients || []).forEach((ing) => {
-      const cleanName = ing.name.trim();
+      const cleanName = ing.name ? ing.name.trim() : '';
       if (!cleanName) return;
 
       const key = `${cleanName.toLowerCase()}_${ing.unit.toLowerCase()}`;
