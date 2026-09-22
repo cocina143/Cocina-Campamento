@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabaseClient'; // Asegúrate de que la ruta a tu cliente de Supabase sea correcta
+import { supabase } from '../lib/supabase';
 
 export interface Ingredient {
   name: string;
@@ -56,35 +56,27 @@ export async function getDishesFromSupabase(): Promise<Dish[]> {
     console.error('Error cargando platos de Supabase:', error);
     throw error;
   }
-return (data || []).map((d: Record<string, any>) => ({
-    id: String(d.id),
-    name: String(d.name),
-    category: d.category as 'Plato principal' | 'Especial',
-    image: String(d.image || ''),
-    ingredients: Array.isArray(d.dish_ingredientes)
-      ? d.dish_ingredientes.map((di: Record<string, any>) => {
-          const ing = Array.isArray(di.Ingredientes) ? di.Ingredientes[0] : di.Ingredientes;
-          return {
-            name: ing?.nombre || 'Sin nombre',
-            amountPerPerson: Number(di.cantidad_por_persona) || 0,
-            unit: ing?.unidad_medida || 'ud',
-          };
-        })
-      : [],
-  }));
-}
-  // Mapeamos la respuesta relacional de Supabase a la interfaz Dish que usa la app
-  return (data || []).map((d: any) => ({
-    id: d.id,
-    name: d.name,
-    category: d.category,
-    image: d.image,
-    ingredients: (d.dish_ingredientes || []).map((di: any) => ({
-      name: di.Ingredientes?.nombre || 'Sin nombre',
-      amountPerPerson: Number(di.cantidad_por_persona) || 0,
-      unit: di.Ingredientes?.unidad_medida || 'ud',
-    })),
-  }));
+
+  return (data || []).map((d: Record<string, any>) => {
+    const rawIngredients = Array.isArray(d.dish_ingredientes) ? d.dish_ingredientes : [];
+    
+    const ingredients: Ingredient[] = rawIngredients.map((di: Record<string, any>) => {
+      const ingData = Array.isArray(di.Ingredientes) ? di.Ingredientes[0] : di.Ingredientes;
+      return {
+        name: ingData?.nombre || 'Sin nombre',
+        amountPerPerson: Number(di.cantidad_por_persona) || 0,
+        unit: ingData?.unidad_medida || 'ud',
+      };
+    });
+
+    return {
+      id: String(d.id),
+      name: String(d.name),
+      category: d.category as 'Plato principal' | 'Especial',
+      image: String(d.image || ''),
+      ingredients,
+    };
+  });
 }
 
 /**
@@ -110,7 +102,7 @@ export async function saveDishToSupabase(dish: Dish): Promise<void> {
   // 2. Procesar cada ingrediente del plato
   for (const ing of dish.ingredients) {
     // Buscar si el ingrediente ya existe en la tabla 'Ingredientes'
-    let { data: existingIng } = await supabase
+    const { data: existingIng } = await supabase
       .from('Ingredientes')
       .select('id')
       .eq('nombre', ing.name)
