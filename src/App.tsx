@@ -1,0 +1,503 @@
+import { useState, useEffect, useMemo } from 'react';
+import { supabase } from '@/lib/supabase';
+import { INITIAL_DISHES } from '@/data/dishes';
+import { INITIAL_MENU, type DayMenu } from '@/data/menu';
+import { DishCard } from '@/components/DishCard';
+import { DishModal } from '@/components/DishModal';
+import { DishManagerModal } from '@/components/DishManagerModal';
+import { MenuPlannerModal } from '@/components/MenuPlannerModal';
+import { Header } from '@/components/Header';
+import { SectionPanel } from '@/components/SectionPanel';
+import type { SectionCounts } from '@/data/sections';
+import { DEFAULT_COUNTS, totalPeople, SECTIONS } from '@/data/sections';
+import { Flame, CheckCircle2, ChefHat, Users, Settings, Utensils, Calendar, Wifi, WifiOff } from 'lucide-react';
+import type { Dish } from '@/data/dishes';
+
+type FilterCategory = 'Todos' | 'Plato principal' | 'Especial';
+
+const STORAGE_KEY = 'cocina-campamento-counts';
+const DATE_KEY = 'cocina-campamento-date';
+const DISHES_KEY = 'cocina-campamento-dishes';
+const CHECKED_KEY = 'cocina-campamento-checked';
+const MENU_KEY = 'cocina-campamento-menu-15d';
+
+function todayStr(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+function loadCounts(): SectionCounts {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return { ...DEFAULT_COUNTS, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return DEFAULT_COUNTS;
+}
+
+function loadDate(): string {
+  try {
+    return localStorage.getItem(DATE_KEY) || todayStr();
+  } catch {
+    return todayStr();
+  }
+}
+
+function loadDishes(): Dish[] {
+  try {
+    const raw = localStorage.getItem(DISHES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return INITIAL_DISHES;
+}
+
+function loadMenu(): DayMenu[] {
+  try {
+    const raw = localStorage.getItem(MENU_KEY);
+    if (raw) {
+      const parsed: DayMenu[] = JSON.parse(raw);
+      return parsed.map((item) => ({
+        ...item,
+        desayuno: Array.isArray(item.desayuno) ? item.desayuno : item.desayuno ? [item.desayuno] : [],
+        comida: Array.isArray(item.comida) ? item.comida : item.comida ? [item.comida] : [],
+        merienda: Array.isArray(item.merienda) ? item.merienda : item.merienda ? [item.merienda] : [],
+        cena: Array.isArray(item.cena) ? item.cena : item.cena ? [item.cena] : [],
+      }));
+    }
+  } catch { /* ignore */ }
+  return INITIAL_MENU;
+}
+
+export default function App() {
+  const [counts, setCounts] = useState<SectionCounts>(loadCounts);
+  const [date, setDate] = useState<string>(loadDate);
+  const [dishesList, setDishesList] = useState<Dish[]>(loadDishes);
+  const [menuList, setMenuList] = useState<DayMenu[]>(loadMenu);
+  const [selectedCampDay, setSelectedCampDay] = useState<number>(1);
+  const [selectedDish, setSelectedDish] = useState<Dish | null>(null);
+  const [filter, setFilter] = useState<FilterCategory>('Todos');
+  const [showSectionPanel, setShowSectionPanel] = useState(false);
+  const [showDishManager, setShowDishManager] = useState(false);
+  const [showMenuPlanner, setShowMenuPlanner] = useState(false);
+  const [isSynced, setIsSynced] = useState<boolean>(true);
+
+  const [checkedIngredients, setCheckedIngredients] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(CHECKED_KEY);
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Carga inicial e integración en tiempo real con Supabase
+  useEffect(() => {
+    async function fetchRemoteDishes() {
+      try {
+        const { data, error } = await supabase.from('dishes').select('*');
+        if (!error && data && data.length > 0) {
+          setDishesList(data as Dish[]);
+          localStorage.setItem(DISHES_KEY, JSON.stringify(data));
+        } else if (data && data.length === 0) {
+          await supabase.from('dishes').upsert(INITIAL_DISHES);
+        }
+      } catch (err) {
+        console.warn('Modo Offline: usando platos locales', err);
+        setIsSynced(false);
+      }
+    }
+
+    async function fetchRemoteMenu() {
+      try {
+        const { data, error } = await supabase.from('menu').select('*').order('day', { ascending: true });
+        if (!error && data && data.length > 0) {
+          const formatted = data.map((item) => ({
+            day: item.day,
+            desayuno: Array.isArray(item.desayuno) ? item.desayuno : item.desayuno ? [item.desayuno] : [],
+            comida: Array.isArray(item.comida) ? item.comida : item.comida ? [item.comida] : [],
+            merienda: Array.isArray(item.merienda) ? item.merienda : item.merienda ? [item.merienda] : [],
+            cena: Array.isArray(item.cena) ? item.cena : item.cena ? [item.cena] : [],
+          }));
+          setMenuList(formatted);
+          localStorage.setItem(MENU_KEY, JSON.stringify(formatted));
+        } else if (data && data.length === 0) {
+          await supabase.from('menu').upsert(INITIAL_MENU);
+        }
+      } catch (err) {
+        console.warn('Modo Offline: usando menú local', err);
+        setIsSynced(false);
+      }
+    }
+
+    fetchRemoteDishes();
+    fetchRemoteMenu();
+
+    const dishesSubscription = supabase
+      .channel('public:dishes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dishes' }, () => {
+        fetchRemoteDishes();
+      })
+      .subscribe();
+
+    const menuSubscription = supabase
+      .channel('public:menu')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu' }, () => {
+        fetchRemoteMenu();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(dishesSubscription);
+      supabase.removeChannel(menuSubscription);
+    };
+  }, []);
+
+  const handleCountsChange = (newCounts: SectionCounts) => {
+    setCounts(newCounts);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(newCounts)); } catch { /* ignore */ }
+  };
+
+  const handleDateChange = (newDate: string) => {
+    setDate(newDate);
+    try { localStorage.setItem(DATE_KEY, newDate); } catch { /* ignore */ }
+  };
+
+  const handleSaveDishes = async (newDishes: Dish[]) => {
+    setDishesList(newDishes);
+    try {
+      localStorage.setItem(DISHES_KEY, JSON.stringify(newDishes));
+      await supabase.from('dishes').upsert(newDishes);
+      setIsSynced(true);
+    } catch (e) {
+      console.warn('Error al sincronizar platos con la nube:', e);
+      setIsSynced(false);
+    }
+  };
+
+  const handleSaveMenu = async (newMenu: DayMenu[]) => {
+    setMenuList(newMenu);
+    try {
+      localStorage.setItem(MENU_KEY, JSON.stringify(newMenu));
+      await supabase.from('menu').upsert(newMenu);
+      setIsSynced(true);
+    } catch (e) {
+      console.warn('Error al sincronizar menú con la nube:', e);
+      setIsSynced(false);
+    }
+  };
+
+  // Fuerza la subida directa de todo el almacenamiento local del dispositivo a Supabase
+  const forceUploadToCloud = async () => {
+    try {
+      const localDishes = loadDishes();
+      const localMenu = loadMenu();
+
+      if (localDishes.length > 0) {
+        await supabase.from('dishes').upsert(localDishes);
+      }
+      if (localMenu.length > 0) {
+        await supabase.from('menu').upsert(localMenu);
+      }
+
+      setIsSynced(true);
+      alert('¡Datos subidos a la nube con éxito! Ahora puedes abrir la app en el PC o recargar para ver todos tus platos.');
+    } catch (err) {
+      console.error('Error al forzar la subida:', err);
+      alert('Error al conectar con la nube. Comprueba tu conexión a Internet.');
+    }
+  };
+
+  const toggleIngredient = (key: string) => {
+    setCheckedIngredients((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      try { localStorage.setItem(CHECKED_KEY, JSON.stringify(Array.from(next))); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  const clearAllChecked = () => {
+    setCheckedIngredients(new Set());
+    try { localStorage.removeItem(CHECKED_KEY); } catch { /* ignore */ }
+  };
+
+  // Filtrado vinculado al Día Seleccionado y a la Categoría
+  const filteredDishes = useMemo(() => {
+    const currentDayMenu = menuList.find((m) => m.day === selectedCampDay);
+    if (!currentDayMenu) return [];
+
+    const activeDishIds = new Set([
+      ...(currentDayMenu.desayuno || []),
+      ...(currentDayMenu.comida || []),
+      ...(currentDayMenu.merienda || []),
+      ...(currentDayMenu.cena || []),
+    ]);
+
+    return dishesList.filter((dish) => {
+      const isPlannedForToday = activeDishIds.has(dish.id) || activeDishIds.has(dish.name);
+      const matchesCategory = filter === 'Todos' || dish.category === filter;
+
+      return isPlannedForToday && matchesCategory;
+    });
+  }, [selectedCampDay, menuList, dishesList, filter]);
+
+  const totalIngredients = filteredDishes.reduce((acc, d) => acc + d.ingredients.length, 0);
+  const checkedCount = filteredDishes.reduce(
+    (acc, d) => acc + d.ingredients.filter((ing) => checkedIngredients.has(`${d.id}-${ing.name}`)).length,
+    0,
+  );
+
+  const total = totalPeople(counts);
+  const activeSectionCount = SECTIONS.filter((s) => counts[s.id] > 0).length;
+
+  return (
+    <div className="min-h-screen bg-stone-50 text-stone-900">
+      <Header counts={counts} date={date} />
+
+      {/* Barra de control */}
+      <section className="sticky top-0 z-30 bg-stone-50/95 backdrop-blur-md border-b border-stone-200/60">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+              <button
+                onClick={() => setShowSectionPanel(true)}
+                className="flex items-center gap-3 bg-white rounded-2xl border border-stone-200 shadow-sm px-4 py-2.5 hover:border-orange-300 hover:shadow-md transition-all flex-1 sm:flex-initial"
+              >
+                <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-orange-600" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-bold text-stone-900 text-sm">
+                    {total} comensales · {activeSectionCount} {activeSectionCount === 1 ? 'sección' : 'secciones'}
+                  </p>
+                  <p className="text-stone-500 text-xs flex items-center gap-1">
+                    <Settings className="w-3 h-3" />
+                    Configurar secciones
+                  </p>
+                </div>
+              </button>
+
+              <div className="flex items-center gap-2 bg-white border border-stone-200 rounded-2xl px-3 py-2.5 shadow-sm">
+                <Calendar className="w-4 h-4 text-orange-600" />
+                <select
+                  value={selectedCampDay}
+                  onChange={(e) => setSelectedCampDay(Number(e.target.value))}
+                  className="bg-transparent text-sm font-bold text-stone-800 focus:outline-none cursor-pointer"
+                >
+                  {menuList.map((m) => (
+                    <option key={m.day} value={m.day}>
+                      Día {m.day} del Campamento
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                onClick={() => setShowMenuPlanner(true)}
+                className="flex items-center justify-center gap-2 bg-orange-600 text-white rounded-2xl px-4 py-3 sm:py-2.5 text-sm font-bold hover:bg-orange-700 transition-all shadow-sm flex-1 sm:flex-initial"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Planificar 15 Días</span>
+              </button>
+
+              <button
+                onClick={() => setShowDishManager(true)}
+                className="flex items-center justify-center gap-2 bg-stone-900 text-white rounded-2xl px-4 py-3 sm:py-2.5 text-sm font-bold hover:bg-stone-800 transition-all shadow-sm flex-1 sm:flex-initial"
+              >
+                <Utensils className="w-4 h-4 text-orange-400" />
+                <span>Editar Platos</span>
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {(['Todos', 'Plato principal', 'Especial'] as FilterCategory[]).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setFilter(cat)}
+                  className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
+                    filter === cat
+                      ? 'bg-orange-600 text-white shadow-md shadow-orange-600/30'
+                      : 'bg-white text-stone-600 border border-stone-200 hover:border-orange-300 hover:text-orange-700'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between text-sm text-stone-500">
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5">
+                <Flame className="w-4 h-4 text-orange-500" />
+                {filteredDishes.length} platos
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                {checkedCount}/{totalIngredients} ingredientes revisados
+              </span>
+            </div>
+
+            {checkedCount > 0 && (
+              <button
+                onClick={clearAllChecked}
+                className="text-xs text-stone-400 hover:text-stone-600 underline transition-colors"
+              >
+                Reiniciar marcas
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Galería de platos */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+        {filteredDishes.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-3xl border border-stone-200/80 shadow-sm">
+            <Utensils className="w-12 h-12 text-stone-300 mx-auto mb-3" />
+            <h3 className="text-lg font-bold text-stone-800">No hay platos programados</h3>
+            <p className="text-stone-500 text-sm max-w-sm mx-auto mt-1 mb-6">
+              No se han asignado platos para el Día {selectedCampDay} en la categoría "{filter}".
+            </p>
+            <button
+              onClick={() => setShowMenuPlanner(true)}
+              className="inline-flex items-center gap-2 bg-orange-600 text-white rounded-xl px-4 py-2.5 text-sm font-bold hover:bg-orange-700 transition-all shadow-sm"
+            >
+              <Calendar className="w-4 h-4" />
+              <span>Planificar Menú del Día {selectedCampDay}</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredDishes.map((dish) => {
+              const dishChecked = dish.ingredients.filter((ing) =>
+                checkedIngredients.has(`${dish.id}-${ing.name}`),
+              ).length;
+              return (
+                <DishCard
+                  key={dish.id}
+                  dish={dish}
+                  counts={counts}
+                  checkedCount={dishChecked}
+                  onClick={() => setSelectedDish(dish)}
+                />
+              );
+            })}
+          </div>
+        )}
+
+        {/* Pie de página con botón de forzar subida */}
+        <footer className="mt-16 pt-8 border-t border-stone-200">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-stone-500 text-sm">
+            <div className="flex items-center gap-2">
+              <ChefHat className="w-5 h-5 text-orange-500" />
+              <span className="font-semibold">Equipo de Cocina de Campamento</span>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-4">
+              <button
+                onClick={forceUploadToCloud}
+                className="px-3 py-1 bg-orange-100 hover:bg-orange-200 text-orange-800 text-xs font-bold rounded-lg transition-colors border border-orange-200 shadow-sm"
+              >
+                ☁️ Subir datos del móvil a la Nube
+              </button>
+
+              <span className="flex items-center gap-1.5 font-medium text-xs">
+                {isSynced ? (
+                  <>
+                    <Wifi className="w-4 h-4 text-green-500" />
+                    <span className="text-green-700">Sincronizado en la Nube</span>
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="w-4 h-4 text-amber-500" />
+                    <span className="text-amber-700">Modo Offline (Guardado local)</span>
+                  </>
+                )}
+              </span>
+              <span>PWA v1.0</span>
+            </div>
+          </div>
+        </footer>
+      </main>
+
+      {showSectionPanel && (
+        <SectionPanel
+          counts={counts}
+          date={date}
+          onChange={handleCountsChange}
+          onDateChange={handleDateChange}
+          onClose={() => setShowSectionPanel(false)}
+        />
+      )}
+
+      {showMenuPlanner && (
+        <MenuPlannerModal
+          menu={menuList}
+          dishes={dishesList}
+          onSaveMenu={handleSaveMenu}
+          onClose={() => setShowMenuPlanner(false)}
+        />
+      )}
+
+      {showDishManager && (
+        <DishManagerModal
+          dishes={dishesList}
+          onSaveDishes={handleSaveDishes}
+          onClose={() => setShowDishManager(false)}
+        />
+      )}
+
+      {selectedDish && (
+        <DishModal
+          dish={selectedDish}
+          counts={counts}
+          checkedIngredients={checkedIngredients}
+          onToggleIngredient={toggleIngredient}
+          onClose={() => setSelectedDish(null)}
+        />
+      )}
+    </div>
+  );
+}
+// Función para migrar las recetas guardadas en el móvil hacia Supabase
+const syncMobileDishesToSupabase = async () => {
+  try {
+    // 1. Leer las recetas guardadas en el localStorage del navegador
+    const localData = localStorage.getItem('dishes'); // O el nombre de la clave que uses
+    if (!localData) {
+      alert('No se encontraron recetas guardadas localmente en este dispositivo.');
+      return;
+    }
+
+    const localDishes = JSON.parse(localData);
+
+    if (!Array.isArray(localDishes) || localDishes.length === 0) {
+      alert('No hay recetas para subir.');
+      return;
+    }
+
+    // 2. Subir/Insertar en Supabase (upsert evita duplicados si coinciden por ID)
+    const { data, error } = await supabase
+      .from('dishes')
+      .upsert(localDishes);
+
+    if (error) {
+      console.error('Error al subir a Supabase:', error);
+      alert('Error al subir las recetas a Supabase: ' + error.message);
+    } else {
+      alert(`¡Éxito! Se han subido ${localDishes.length} recetas a Supabase.`);
+      // Opcional: Recargar los datos desde Supabase
+      window.location.reload();
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Ocurrió un error inesperado al sincronizar.');
+  }
+};
+<button 
+  onClick={syncMobileDishesToSupabase}
+  className="bg-green-600 text-white px-4 py-2 rounded-xl font-bold text-sm"
+>
+  ☁️ Subir recetas del móvil a la Nube
+</button>

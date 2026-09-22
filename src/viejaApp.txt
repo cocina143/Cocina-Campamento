@@ -1,0 +1,302 @@
+import { useState, useMemo } from 'react';
+import { INITIAL_DISHES } from '@/data/dishes';
+import { DishCard } from '@/components/DishCard';
+import { DishModal } from '@/components/DishModal';
+import { DishManagerModal } from '@/components/DishManagerModal';
+import { Header } from '@/components/Header';
+import { SectionPanel } from '@/components/SectionPanel';
+import type { SectionCounts } from '@/data/sections';
+import { DEFAULT_COUNTS, totalPeople, SECTIONS } from '@/data/sections';
+import { Flame, CheckCircle2, Clock, ChefHat, Users, Settings, Utensils } from 'lucide-react';
+import type { Dish } from '@/data/dishes';
+
+type FilterCategory = 'Todos' | 'Plato principal' | 'Especial';
+
+const STORAGE_KEY = 'cocina-campamento-counts';
+const DATE_KEY = 'cocina-campamento-date';
+const DISHES_KEY = 'cocina-campamento-dishes';
+const CHECKED_KEY = 'cocina-campamento-checked';
+
+function todayStr(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+function loadCounts(): SectionCounts {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return { ...DEFAULT_COUNTS, ...parsed };
+    }
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_COUNTS;
+}
+
+function loadDate(): string {
+  try {
+    return localStorage.getItem(DATE_KEY) || todayStr();
+  } catch {
+    return todayStr();
+  }
+}
+
+// Carga las recetas de localStorage o usa las iniciales si es la primera vez
+function loadDishes(): Dish[] {
+  try {
+    const raw = localStorage.getItem(DISHES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    /* ignore */
+  }
+  return INITIAL_DISHES;
+}
+
+export default function App() {
+  const [counts, setCounts] = useState<SectionCounts>(loadCounts);
+  const [date, setDate] = useState<string>(loadDate);
+  const [dishesList, setDishesList] = useState<Dish[]>(loadDishes);
+  const [selectedDish, setSelectedDish] = useState<Dish | null>(null);
+  const [filter, setFilter] = useState<FilterCategory>('Todos');
+  const [showSectionPanel, setShowSectionPanel] = useState(false);
+  const [showDishManager, setShowDishManager] = useState(false);
+
+  // Carga ingredientes marcados guardados
+  const [checkedIngredients, setCheckedIngredients] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(CHECKED_KEY);
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  const handleCountsChange = (newCounts: SectionCounts) => {
+    setCounts(newCounts);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newCounts));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleDateChange = (newDate: string) => {
+    setDate(newDate);
+    try {
+      localStorage.setItem(DATE_KEY, newDate);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // Guardar platos editados/creados
+  const handleSaveDishes = (newDishes: Dish[]) => {
+    setDishesList(newDishes);
+    try {
+      localStorage.setItem(DISHES_KEY, JSON.stringify(newDishes));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const toggleIngredient = (key: string) => {
+    setCheckedIngredients((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+
+      try {
+        localStorage.setItem(CHECKED_KEY, JSON.stringify(Array.from(next)));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  const clearAllChecked = () => {
+    setCheckedIngredients(new Set());
+    try {
+      localStorage.removeItem(CHECKED_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // Filtrar usando la lista dinámica guardada localmente
+  const filteredDishes = useMemo(() => {
+    if (filter === 'Todos') return dishesList;
+    return dishesList.filter((d) => d.category === filter);
+  }, [filter, dishesList]);
+
+  const totalIngredients = filteredDishes.reduce(
+    (acc, d) => acc + d.ingredients.length,
+    0,
+  );
+  const checkedCount = filteredDishes.reduce(
+    (acc, d) =>
+      acc +
+      d.ingredients.filter((ing) =>
+        checkedIngredients.has(`${d.id}-${ing.name}`),
+      ).length,
+    0,
+  );
+
+  const total = totalPeople(counts);
+  const activeSectionCount = SECTIONS.filter((s) => counts[s.id] > 0).length;
+
+  return (
+    <div className="min-h-screen bg-stone-50 text-stone-900">
+      <Header counts={counts} date={date} />
+
+      {/* Barra de control */}
+      <section className="sticky top-0 z-30 bg-stone-50/95 backdrop-blur-md border-b border-stone-200/60">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            
+            {/* Grupo de Botones de Gestión */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+              <button
+                onClick={() => setShowSectionPanel(true)}
+                className="flex items-center gap-3 bg-white rounded-2xl border border-stone-200 shadow-sm px-4 py-2.5 hover:border-orange-300 hover:shadow-md transition-all w-full sm:w-auto"
+              >
+                <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-orange-600" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-bold text-stone-900 text-sm">
+                    {total} comensales · {activeSectionCount}{' '}
+                    {activeSectionCount === 1 ? 'sección' : 'secciones'}
+                  </p>
+                  <p className="text-stone-500 text-xs flex items-center gap-1">
+                    <Settings className="w-3 h-3" />
+                    Configurar secciones del día
+                  </p>
+                </div>
+              </button>
+
+              {/* Botón Abrir Editor de Platos */}
+              <button
+                onClick={() => setShowDishManager(true)}
+                className="flex items-center justify-center gap-2 bg-stone-900 text-white rounded-2xl px-4 py-3 sm:py-2.5 text-sm font-bold hover:bg-stone-800 transition-all w-full sm:w-auto shadow-sm"
+              >
+                <Utensils className="w-4 h-4 text-orange-400" />
+                <span>Editar Platos</span>
+              </button>
+            </div>
+
+            {/* Filtros */}
+            <div className="flex flex-wrap items-center gap-2">
+              {(['Todos', 'Plato principal', 'Especial'] as FilterCategory[]).map(
+                (cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setFilter(cat)}
+                    className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
+                      filter === cat
+                        ? 'bg-orange-600 text-white shadow-md shadow-orange-600/30'
+                        : 'bg-white text-stone-600 border border-stone-200 hover:border-orange-300 hover:text-orange-700'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ),
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between text-sm text-stone-500">
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5">
+                <Flame className="w-4 h-4 text-orange-500" />
+                {filteredDishes.length} platos
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                {checkedCount}/{totalIngredients} ingredientes revisados
+              </span>
+            </div>
+
+            {checkedCount > 0 && (
+              <button
+                onClick={clearAllChecked}
+                className="text-xs text-stone-400 hover:text-stone-600 underline transition-colors"
+              >
+                Reiniciar marcas
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Galería de platos */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredDishes.map((dish) => {
+            const dishChecked = dish.ingredients.filter((ing) =>
+              checkedIngredients.has(`${dish.id}-${ing.name}`),
+            ).length;
+            return (
+              <DishCard
+                key={dish.id}
+                dish={dish}
+                counts={counts}
+                checkedCount={dishChecked}
+                onClick={() => setSelectedDish(dish)}
+              />
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <footer className="mt-16 pt-8 border-t border-stone-200">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-stone-500 text-sm">
+            <div className="flex items-center gap-2">
+              <ChefHat className="w-5 h-5 text-orange-500" />
+              <span className="font-semibold">Equipo de Cocina de Campamento</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5">
+                <Clock className="w-4 h-4" />
+                Datos offline disponibles
+              </span>
+              <span>PWA v1.0</span>
+            </div>
+          </div>
+        </footer>
+      </main>
+
+      {/* Modal de secciones */}
+      {showSectionPanel && (
+        <SectionPanel
+          counts={counts}
+          date={date}
+          onChange={handleCountsChange}
+          onDateChange={handleDateChange}
+          onClose={() => setShowSectionPanel(false)}
+        />
+      )}
+
+      {/* Modal del Gestor de Platos */}
+      {showDishManager && (
+        <DishManagerModal
+          dishes={dishesList}
+          onSaveDishes={handleSaveDishes}
+          onClose={() => setShowDishManager(false)}
+        />
+      )}
+
+      {/* Modal de detalle de un plato */}
+      {selectedDish && (
+        <DishModal
+          dish={selectedDish}
+          counts={counts}
+          checkedIngredients={checkedIngredients}
+          onToggleIngredient={toggleIngredient}
+          onClose={() => setSelectedDish(null)}
+        />
+      )}
+    </div>
+  );
+}
