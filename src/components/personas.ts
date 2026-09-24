@@ -57,7 +57,6 @@ export function detectAllergenConflicts(
 
     persona.alergias.forEach((alergia) => {
       const alergiaLower = alergia.toLowerCase().trim();
-      // Comprobar si algún ingrediente del plato contiene la alergia
       const ingredienteConflictivo = dishIngredients.some((ing) =>
         ing.name.toLowerCase().includes(alergiaLower)
       );
