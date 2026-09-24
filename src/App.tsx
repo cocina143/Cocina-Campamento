@@ -14,11 +14,13 @@ import { MenuPlannerModal } from '@/components/MenuPlannerModal';
 import { Header } from '@/components/Header';
 import { SectionPanel } from '@/components/SectionPanel';
 import { generateDailyShoppingPDF, generateGlobalShoppingPDF } from '@/services/pdfService';
+import { getPersonasFromSupabase, savePersonaToSupabase, detectAllergenConflicts, type Persona } from '@/data/personas';
+import { PeopleManagerModal } from '@/components/PeopleManagerModal';
 import type { SectionCounts } from '@/data/sections';
 import { DEFAULT_COUNTS, totalPeople, SECTIONS } from '@/data/sections';
 import { 
   Flame, CheckCircle2, ChefHat, Users, Settings, Utensils, Calendar, 
-  Wifi, WifiOff, FileDown, ShoppingBag, Coffee, Sun, Apple, Moon 
+  Wifi, WifiOff, FileDown, ShoppingBag, Coffee, Sun, Apple, Moon, AlertTriangle 
 } from 'lucide-react';
 
 type FilterCategory = 'Todos' | 'Plato principal' | 'Especial';
@@ -85,6 +87,8 @@ export default function App() {
   const [showSectionPanel, setShowSectionPanel] = useState(false);
   const [showDishManager, setShowDishManager] = useState(false);
   const [showMenuPlanner, setShowMenuPlanner] = useState(false);
+  const [showPeopleManager, setShowPeopleManager] = useState(false);
+  const [personasList, setPersonasList] = useState<Persona[]>([]);
   const [isSynced, setIsSynced] = useState<boolean>(true);
 
   const [checkedIngredients, setCheckedIngredients] = useState<Set<string>>(() => {
@@ -167,9 +171,19 @@ export default function App() {
       }
     }
 
+    async function fetchRemotePersonas() {
+      try {
+        const remotePersonas = await getPersonasFromSupabase();
+        setPersonasList(remotePersonas);
+      } catch (err) {
+        console.warn('Modo Offline: sin personas cargadas', err);
+      }
+    }
+
     fetchRemoteDishes();
     fetchRemoteMenu();
     fetchRemoteCounts();
+    fetchRemotePersonas();
 
     const dishesSubscription = supabase
       .channel('public:dishes')
@@ -192,10 +206,18 @@ export default function App() {
       })
       .subscribe();
 
+    const personasSubscription = supabase
+      .channel('public:personas')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'personas' }, () => {
+        fetchRemotePersonas();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(dishesSubscription);
       supabase.removeChannel(menuSubscription);
       supabase.removeChannel(countsSubscription);
+      supabase.removeChannel(personasSubscription);
     };
   }, []);
 
@@ -262,6 +284,19 @@ export default function App() {
     }
   };
 
+  const handleSavePersonas = async (newPersonas: Persona[]) => {
+    setPersonasList(newPersonas);
+    try {
+      for (const persona of newPersonas) {
+        await savePersonaToSupabase(persona);
+      }
+      setIsSynced(true);
+    } catch (e) {
+      console.warn('Error al sincronizar personas con la nube:', e);
+      setIsSynced(false);
+    }
+  };
+
   const forceUploadToCloud = async () => {
     try {
       const localDishes = loadDishes();
@@ -283,9 +318,14 @@ export default function App() {
         date: localDate,
         updated_at: new Date().toISOString(),
       });
+      if (personasList.length > 0) {
+        for (const persona of personasList) {
+          await savePersonaToSupabase(persona);
+        }
+      }
 
       setIsSynced(true);
-      alert('¡Datos subidos a la nube con éxito! (Platos, Menú y Comensales)');
+      alert('¡Datos subidos a la nube con éxito! (Platos, Menú, Comensales y Alergias)');
     } catch (err) {
       console.error('Error al forzar la subida:', err);
       alert('Error al conectar con la nube. Comprueba tu conexión a Internet o los permisos.');
@@ -312,7 +352,7 @@ export default function App() {
   };
 
   // ─────────────────────────────────────────────────────────────
-  // AGRUPACIÓN POR COMIDAS
+  // AGRUPACIÓN POR COMIDAS Y LÓGICA DE ALERGIAS
   // ─────────────────────────────────────────────────────────────
   const MEAL_CONFIG = [
     { key: 'desayuno', label: 'Desayuno', icon: Coffee },
@@ -351,6 +391,52 @@ export default function App() {
     0
   );
 
+  // Detectar conflictos de alergias por plato
+  const dishConflicts = useMemo(() => {
+    const conflictMap = new Map<string, { persona: Persona; alergiasCoincidentes: string[] }[]>();
+    allVisibleDishes.forEach((dish) => {
+      const conflicts = detectAllergenConflicts(dish.ingredients || [], personasList);
+      if (conflicts.length > 0) {
+        conflictMap.set(dish.id, conflicts);
+      }
+    });
+    return conflictMap;
+  }, [allVisibleDishes, personasList]);
+
+  // Resumen de raciones especiales del día
+  const allergySummary = useMemo(() => {
+    const personasConAlergias = personasList.filter((p) => p.alergias.length > 0);
+    const platosAfectados = new Set<string>();
+    const detalles: { persona: string; alergias: string[]; platos: string[] }[] = [];
+
+    allVisibleDishes.forEach((dish) => {
+      const conflicts = detectAllergenConflicts(dish.ingredients || [], personasList);
+      if (conflicts.length > 0) {
+        platosAfectados.add(dish.name);
+        conflicts.forEach((c) => {
+          const existing = detalles.find((d) => d.persona === c.persona.nombre);
+          if (existing) {
+            if (!existing.platos.includes(dish.name)) {
+              existing.platos.push(dish.name);
+            }
+          } else {
+            detalles.push({
+              persona: c.persona.nombre,
+              alergias: c.alergiasCoincidentes,
+              platos: [dish.name],
+            });
+          }
+        });
+      }
+    });
+
+    return {
+      totalPersonas: personasConAlergias.length,
+      platosAfectados: Array.from(platosAfectados),
+      detalles,
+    };
+  }, [allVisibleDishes, personasList]);
+
   const total = totalPeople(counts);
   const activeSectionCount = SECTIONS.filter((s) => counts[s.id] > 0).length;
 
@@ -381,6 +467,25 @@ export default function App() {
                   <p className="text-stone-500 text-xs flex items-center gap-1">
                     <Settings className="w-3 h-3" />
                     Configurar secciones
+                  </p>
+                </div>
+              </button>
+
+              {/* Botón de Alergias */}
+              <button
+                onClick={() => setShowPeopleManager(true)}
+                className="flex items-center gap-3 bg-white rounded-2xl border border-stone-200 shadow-sm px-4 py-2.5 hover:border-red-300 hover:shadow-md transition-all flex-1 sm:flex-initial"
+              >
+                <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-bold text-stone-900 text-sm">
+                    {personasList.length} {personasList.length === 1 ? 'persona' : 'personas'} con alergias
+                  </p>
+                  <p className="text-stone-500 text-xs flex items-center gap-1">
+                    <Settings className="w-3 h-3" />
+                    Gestionar alergias
                   </p>
                 </div>
               </button>
@@ -485,6 +590,41 @@ export default function App() {
 
       {/* Galería de platos agrupados por comida */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+        {/* Banner resumen de alergias del día */}
+        {personasList.length > 0 && allergySummary.totalPersonas > 0 && (
+          <div className={`mb-6 rounded-2xl p-4 border ${
+            allergySummary.platosAfectados.length > 0
+              ? 'bg-red-50 border-red-200'
+              : 'bg-green-50 border-green-200'
+          }`}>
+            <div className="flex items-start gap-3">
+              {allergySummary.platosAfectados.length > 0 ? (
+                <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+              )}
+              <div className="flex-1">
+                <p className={`font-bold text-sm ${
+                  allergySummary.platosAfectados.length > 0 ? 'text-red-800' : 'text-green-800'
+                }`}>
+                  {allergySummary.platosAfectados.length > 0
+                    ? `⚠️ Hoy hay que preparar raciones especiales para ${allergySummary.detalles.length} ${allergySummary.detalles.length === 1 ? 'persona' : 'personas'}`
+                    : '✅ Sin conflictos de alergias en el menú de hoy'}
+                </p>
+                {allergySummary.detalles.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {allergySummary.detalles.map((detalle, idx) => (
+                      <p key={idx} className="text-xs text-red-700">
+                        <strong>{detalle.persona}</strong> ({detalle.alergias.join(', ')}) → necesita ración sin alérgenos en: {detalle.platos.join(', ')}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {groupedDishes.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-stone-200/80 shadow-sm">
             <Utensils className="w-12 h-12 text-stone-300 mx-auto mb-3" />
@@ -519,14 +659,30 @@ export default function App() {
                     const dishChecked = (dish.ingredients || []).filter((ing) =>
                       checkedIngredients.has(`${dish.id}-${ing.name}`)
                     ).length;
+                    const conflicts = dishConflicts.get(dish.id);
                     return (
-                      <DishCard
-                        key={dish.id}
-                        dish={dish}
-                        counts={counts}
-                        checkedCount={dishChecked}
-                        onClick={() => setSelectedDish(dish)}
-                      />
+                      <div key={dish.id} className="flex flex-col gap-2">
+                        <DishCard
+                          dish={dish}
+                          counts={counts}
+                          checkedCount={dishChecked}
+                          onClick={() => setSelectedDish(dish)}
+                        />
+                        {/* Alerta de alergias si hay conflictos */}
+                        {conflicts && conflicts.length > 0 && (
+                          <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+                            <div className="text-xs text-red-800">
+                              <p className="font-bold mb-1">⚠️ Requiere ración especial:</p>
+                              {conflicts.map((c, idx) => (
+                                <p key={idx}>
+                                  <strong>{c.persona.nombre}</strong> — no puede tomar: {c.alergiasCoincidentes.join(', ')}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -593,6 +749,14 @@ export default function App() {
           dishes={dishesList}
           onSaveDishes={handleSaveDishes}
           onClose={() => setShowDishManager(false)}
+        />
+      )}
+
+      {showPeopleManager && (
+        <PeopleManagerModal
+          personas={personasList}
+          onSavePersonas={handleSavePersonas}
+          onClose={() => setShowPeopleManager(false)}
         />
       )}
 
