@@ -92,7 +92,7 @@ export default function App() {
     }
   });
 
-  // Carga inicial usando getDishesFromSupabase (Tabla única con JSONB)
+  // Carga inicial y sincronización en tiempo real
   useEffect(() => {
     async function fetchRemoteDishes() {
       try {
@@ -102,7 +102,6 @@ export default function App() {
           localStorage.setItem(DISHES_KEY, JSON.stringify(remoteDishes));
           setIsSynced(true);
         } else {
-          // Si Supabase está vacío, subir platos iniciales
           for (const dish of INITIAL_DISHES) {
             await saveDishToSupabase(dish);
           }
@@ -121,42 +120,3 @@ export default function App() {
         if (!error && data && data.length > 0) {
           const formatted = data.map((item) => ({
             day: item.day,
-            desayuno: Array.isArray(item.desayuno) ? item.desayuno : item.desayuno ? [item.desayuno] : [],
-            comida: Array.isArray(item.comida) ? item.comida : item.comida ? [item.comida] : [],
-            merienda: Array.isArray(item.merienda) ? item.merienda : item.merienda ? [item.merienda] : [],
-            cena: Array.isArray(item.cena) ? item.cena : item.cena ? [item.cena] : [],
-          }));
-          setMenuList(formatted);
-          localStorage.setItem(MENU_KEY, JSON.stringify(formatted));
-          setIsSynced(true);
-        } else if (data && data.length === 0) {
-          await supabase.from('menu').upsert(INITIAL_MENU);
-        }
-      } catch (err) {
-        console.warn('Modo Offline/Error menú:', err);
-        setIsSynced(false);
-      }
-    }
-
-    fetchRemoteDishes();
-    fetchRemoteMenu();
-
-    // Suscripciones en tiempo real
-    const dishesSubscription = supabase
-      .channel('public:dishes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'dishes' }, () => {
-        fetchRemoteDishes();
-      })
-      .subscribe();
-
-    const menuSubscription = supabase
-      .channel('public:menu')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu' }, () => {
-        fetchRemoteMenu();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(dishesSubscription);
-      supabase.removeChannel(menuSubscription);
-    };
