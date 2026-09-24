@@ -1,25 +1,5 @@
 import { supabase } from '@/lib/supabase';
 
-// ─── Alérgenos y etiquetas dietéticas disponibles ─────────────
-export const ALLERGEN_OPTIONS = [
-  { id: 'gluten', label: 'Gluten', icon: '🌾' },
-  { id: 'lactosa', label: 'Lactosa', icon: '🥛' },
-  { id: 'huevo', label: 'Huevo', icon: '🥚' },
-  { id: 'pescado', label: 'Pescado', icon: '🐟' },
-  { id: 'marisco', label: 'Marisco', icon: '🦐' },
-  { id: 'frutos_secos', label: 'Frutos secos', icon: '🥜' },
-  { id: 'soja', label: 'Soja', icon: '🫘' },
-] as const;
-
-export const DIET_OPTIONS = [
-  { id: 'vegetariano', label: 'Vegetariano', icon: '🥬' },
-  { id: 'vegano', label: 'Vegano', icon: '🌱' },
-] as const;
-
-export type AllergenId = typeof ALLERGEN_OPTIONS[number]['id'];
-export type DietId = typeof DIET_OPTIONS[number]['id'];
-
-// ─── Interfaces ────────────────────────────────────────────────
 export interface Ingredient {
   name: string;
   amount: number;
@@ -32,8 +12,6 @@ export interface Dish {
   category: 'Plato principal' | 'Especial';
   image: string;
   ingredients: Ingredient[];
-  allergens: AllergenId[];   // ← NUEVO: alérgenos que contiene
-  diets: DietId[];           // ← NUEVO: apto para vegetariano/vegano
 }
 
 export const INITIAL_DISHES: Dish[] = [
@@ -50,8 +28,6 @@ export const INITIAL_DISHES: Dish[] = [
       { name: 'Queso rallado', amount: 15, unit: 'g' },
       { name: 'Aceite de oliva', amount: 10, unit: 'ml' },
     ],
-    allergens: ['gluten', 'lactosa'],
-    diets: [],
   },
   {
     id: 'lentejas-verduras',
@@ -66,8 +42,6 @@ export const INITIAL_DISHES: Dish[] = [
       { name: 'Pimiento verde', amount: 15, unit: 'g' },
       { name: 'Chorizo', amount: 25, unit: 'g' },
     ],
-    allergens: [],
-    diets: [],
   },
   {
     id: 'pollo-empanado',
@@ -81,8 +55,6 @@ export const INITIAL_DISHES: Dish[] = [
       { name: 'Patatas', amount: 150, unit: 'g' },
       { name: 'Aceite para freír', amount: 30, unit: 'ml' },
     ],
-    allergens: ['gluten', 'huevo'],
-    diets: [],
   },
 ];
 
@@ -90,36 +62,38 @@ export const INITIAL_DISHES: Dish[] = [
 export async function getDishesFromSupabase(): Promise<Dish[]> {
   const { data, error } = await supabase
     .from('dishes')
-    .select('id, name, category, image, ingredients, allergens, diets')
+    .select('id, name, category, image, ingredients')
     .order('name');
 
-  if (error) {
+  if (error || !data) {
     console.error('❌ Error obteniendo platos de Supabase:', error);
-    throw error;
+    return INITIAL_DISHES; // Fallback para que la app nunca se rompa
   }
 
-  return (data || []).map((d: any) => ({
-    id: d.id,
-    name: d.name,
-    category: d.category,
-    image: d.image,
-    ingredients: (Array.isArray(d.ingredients) ? d.ingredients : []).map((ing: any) => ({
-      name: ing.name || '',
-      amount: Number(ing.amount ?? ing.amountPerPerson) || 0,
-      unit: ing.unit || 'g',
-    })),
-    allergens: Array.isArray(d.allergens) ? d.allergens : [],
-    diets: Array.isArray(d.diets) ? d.diets : [],
+  return data.map((d: any) => ({
+    id: String(d.id),
+    name: String(d.name),
+    category: d.category === 'Especial' ? 'Especial' : 'Plato principal',
+    image: String(d.image || ''),
+    ingredients: Array.isArray(d.ingredients)
+      ? d.ingredients.map((ing: any) => ({
+          name: String(ing.name || ''),
+          amount: Number(ing.amount) || 0,
+          unit: String(ing.unit || 'g'),
+        }))
+      : [],
   }));
 }
 
 // 2. GUARDAR / ACTUALIZAR UN PLATO
 export async function saveDishToSupabase(dish: Dish): Promise<void> {
-  const formattedIngredients = (dish.ingredients || []).map((ing: any) => ({
-    name: ing.name ? ing.name.trim() : '',
-    amount: Number(ing.amount ?? ing.amountPerPerson) || 0,
-    unit: ing.unit ? ing.unit.trim() : 'g',
-  })).filter((ing) => ing.name !== '');
+  const formattedIngredients = (dish.ingredients || [])
+    .filter((ing) => ing.name && ing.name.trim() !== '')
+    .map((ing) => ({
+      name: ing.name.trim(),
+      amount: Number(ing.amount) || 0,
+      unit: ing.unit ? ing.unit.trim() : 'g',
+    }));
 
   const { error } = await supabase
     .from('dishes')
@@ -129,8 +103,6 @@ export async function saveDishToSupabase(dish: Dish): Promise<void> {
       category: dish.category,
       image: dish.image,
       ingredients: formattedIngredients,
-      allergens: dish.allergens || [],
-      diets: dish.diets || [],
       updated_at: new Date().toISOString(),
     });
 
@@ -143,12 +115,15 @@ export async function saveDishToSupabase(dish: Dish): Promise<void> {
 // 3. HELPER: CALCULAR TOTALES / LISTA DE LA COMPRA
 export function calculateTotalIngredients(selectedDishes: Dish[], totalPeople: number = 1) {
   const totals: Record<string, { name: string; amount: number; unit: string }> = {};
+  
   selectedDishes.forEach((dish) => {
-    (dish.ingredients || []).forEach((ing: any) => {
+    (dish.ingredients || []).forEach((ing) => {
       const cleanName = ing.name ? ing.name.trim() : '';
       if (!cleanName) return;
-      const qty = Number(ing.amount ?? ing.amountPerPerson) || 0;
+      
       const key = `${cleanName.toLowerCase()}_${ing.unit.toLowerCase()}`;
+      const qty = Number(ing.amount) || 0;
+      
       if (totals[key]) {
         totals[key].amount += qty * totalPeople;
       } else {
@@ -156,5 +131,6 @@ export function calculateTotalIngredients(selectedDishes: Dish[], totalPeople: n
       }
     });
   });
+  
   return Object.values(totals);
 }
