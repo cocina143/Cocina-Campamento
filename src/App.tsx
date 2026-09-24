@@ -15,7 +15,8 @@ import { Header } from '@/components/Header';
 import { SectionPanel } from '@/components/SectionPanel';
 import type { SectionCounts } from '@/data/sections';
 import { DEFAULT_COUNTS, totalPeople, SECTIONS } from '@/data/sections';
-import { Flame, CheckCircle2, ChefHat, Users, Settings, Utensils, Calendar, Wifi, WifiOff } from 'lucide-react';
+import { generateDailyShoppingPDF, generateGlobalShoppingPDF } from '@/services/pdfService';
+import { Flame, CheckCircle2, ChefHat, Users, Settings, Utensils, Calendar, Wifi, WifiOff, FileDown, ShoppingBag } from 'lucide-react';
 
 type FilterCategory = 'Todos' | 'Plato principal' | 'Especial';
 
@@ -371,6 +372,30 @@ export default function App() {
               >
                 <Utensils className="w-4 h-4 text-orange-400" />
                 <span>Editar Platos</span>
+              </button>
+                            {/* Botón PDF Lista Compra del Día */}
+              <button
+                onClick={() => {
+                  const currentDayMenu = menuList.find((m) => m.day === selectedCampDay);
+                  if (currentDayMenu) {
+                    generateDailyShoppingPDF(currentDayMenu, dishesList, counts);
+                  }
+                }}
+                className="flex items-center justify-center gap-2 bg-emerald-600 text-white rounded-2xl px-4 py-3 sm:py-2.5 text-sm font-bold hover:bg-emerald-700 transition-all shadow-sm flex-1 sm:flex-initial"
+              >
+                <FileDown className="w-4 h-4" />
+                <span>PDF Día</span>
+              </button>
+
+              {/* Botón PDF Lista Compra Global 15 días */}
+              <button
+                onClick={() => {
+                  generateGlobalShoppingPDF(menuList, dishesList, counts);
+                }}
+                className="flex items-center justify-center gap-2 bg-teal-700 text-white rounded-2xl px-4 py-3 sm:py-2.5 text-sm font-bold hover:bg-teal-800 transition-all shadow-sm flex-1 sm:flex-initial"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                <span>PDF 15 Días</span>
               </button>
             </div>
 
