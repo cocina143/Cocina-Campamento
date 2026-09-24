@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 export interface Ingredient {
   name: string;
   amount: number;
-  amountPerPerson: number; // ← Añadido para compatibilidad con el modal
+  amountPerPerson: number; // ← Compatibilidad con DishManagerModal
   unit: string;
 }
 
@@ -76,9 +76,9 @@ export async function getDishesFromSupabase(): Promise<Dish[]> {
     name: d.name,
     category: d.category,
     image: d.image,
+    // ✅ Devolvemos AMBOS campos para compatibilidad total
     ingredients: (Array.isArray(d.ingredients) ? d.ingredients : []).map((ing: any) => ({
       name: ing.name || '',
-      // ✅ Devolvemos AMBOS campos para compatibilidad con el modal y la app
       amount: Number(ing.amount ?? ing.amountPerPerson) || 0,
       amountPerPerson: Number(ing.amount ?? ing.amountPerPerson) || 0,
       unit: ing.unit || 'g',
@@ -119,6 +119,7 @@ export function calculateTotalIngredients(selectedDishes: Dish[], totalPeople: n
     (dish.ingredients || []).forEach((ing: any) => {
       const cleanName = ing.name ? ing.name.trim() : '';
       if (!cleanName) return;
+      // ✅ Leemos ambos campos
       const qty = Number(ing.amount ?? ing.amountPerPerson) || 0;
       const key = `${cleanName.toLowerCase()}_${ing.unit.toLowerCase()}`;
       if (totals[key]) {
