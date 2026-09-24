@@ -13,10 +13,14 @@ import { DishManagerModal } from '@/components/DishManagerModal';
 import { MenuPlannerModal } from '@/components/MenuPlannerModal';
 import { Header } from '@/components/Header';
 import { SectionPanel } from '@/components/SectionPanel';
+import { generateDailyShoppingPDF, generateGlobalShoppingPDF } from '@/services/pdfService';
 import type { SectionCounts } from '@/data/sections';
 import { DEFAULT_COUNTS, totalPeople, SECTIONS } from '@/data/sections';
-import { generateDailyShoppingPDF, generateGlobalShoppingPDF } from '@/services/pdfService';
-import { Flame, CheckCircle2, ChefHat, Users, Settings, Utensils, Calendar, Wifi, WifiOff, FileDown, ShoppingBag, Coffee, Sun, Apple, Moon } from 'lucide-react';
+import { 
+  Flame, CheckCircle2, ChefHat, Users, Settings, Utensils, Calendar, 
+  Wifi, WifiOff, FileDown, ShoppingBag, Coffee, Sun, Apple, Moon 
+} from 'lucide-react';
+
 type FilterCategory = 'Todos' | 'Plato principal' | 'Especial';
 
 const STORAGE_KEY = 'cocina-campamento-counts';
@@ -92,6 +96,9 @@ export default function App() {
     }
   });
 
+  // ─────────────────────────────────────────────────────────────
+  // CARGA INICIAL Y SINCRONIZACIÓN EN TIEMPO REAL
+  // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     async function fetchRemoteDishes() {
       try {
@@ -115,9 +122,12 @@ export default function App() {
 
     async function fetchRemoteMenu() {
       try {
-        const { data, error } = await supabase.from('menu').select('*').order('day', { ascending: true });
+        const { data, error } = await supabase
+          .from('menu')
+          .select('*')
+          .order('day', { ascending: true });
         if (!error && data && data.length > 0) {
-          const formatted = data.map((item) => ({
+          const formatted = data.map((item: any) => ({
             day: item.day,
             desayuno: Array.isArray(item.desayuno) ? item.desayuno : item.desayuno ? [item.desayuno] : [],
             comida: Array.isArray(item.comida) ? item.comida : item.comida ? [item.comida] : [],
@@ -163,17 +173,23 @@ export default function App() {
 
     const dishesSubscription = supabase
       .channel('public:dishes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'dishes' }, () => { fetchRemoteDishes(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dishes' }, () => {
+        fetchRemoteDishes();
+      })
       .subscribe();
 
     const menuSubscription = supabase
       .channel('public:menu')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu' }, () => { fetchRemoteMenu(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu' }, () => {
+        fetchRemoteMenu();
+      })
       .subscribe();
 
     const countsSubscription = supabase
       .channel('public:comensales')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'comensales' }, () => { fetchRemoteCounts(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'comensales' }, () => {
+        fetchRemoteCounts();
+      })
       .subscribe();
 
     return () => {
@@ -183,6 +199,9 @@ export default function App() {
     };
   }, []);
 
+  // ─────────────────────────────────────────────────────────────
+  // HANDLERS
+  // ─────────────────────────────────────────────────────────────
   const handleCountsChange = async (newCounts: SectionCounts) => {
     setCounts(newCounts);
     try {
@@ -258,12 +277,11 @@ export default function App() {
       if (localMenu.length > 0) {
         await supabase.from('menu').upsert(localMenu);
       }
-      
       await supabase.from('comensales').upsert({
         id: 'main',
         counts: localCounts,
         date: localDate,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       });
 
       setIsSynced(true);
@@ -279,16 +297,23 @@ export default function App() {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
-      try { localStorage.setItem(CHECKED_KEY, JSON.stringify(Array.from(next))); } catch { /* ignore */ }
+      try {
+        localStorage.setItem(CHECKED_KEY, JSON.stringify(Array.from(next)));
+      } catch { /* ignore */ }
       return next;
     });
   };
 
   const clearAllChecked = () => {
     setCheckedIngredients(new Set());
-    try { localStorage.removeItem(CHECKED_KEY); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem(CHECKED_KEY);
+    } catch { /* ignore */ }
   };
-      // Configuración de las 4 comidas con sus iconos
+
+  // ─────────────────────────────────────────────────────────────
+  // AGRUPACIÓN POR COMIDAS
+  // ─────────────────────────────────────────────────────────────
   const MEAL_CONFIG = [
     { key: 'desayuno', label: 'Desayuno', icon: Coffee },
     { key: 'comida', label: 'Comida', icon: Sun },
@@ -296,7 +321,6 @@ export default function App() {
     { key: 'cena', label: 'Cena', icon: Moon },
   ] as const;
 
-  // Agrupar platos por comida del día seleccionado
   const groupedDishes = useMemo(() => {
     const currentDayMenu = menuList.find((m) => m.day === selectedCampDay);
     if (!currentDayMenu) return [];
@@ -312,26 +336,35 @@ export default function App() {
     }).filter((group) => group.dishes.length > 0);
   }, [selectedCampDay, menuList, dishesList, filter]);
 
-  // Lista plana para los contadores
   const allVisibleDishes = groupedDishes.flatMap((g) => g.dishes);
 
-  const totalIngredients = allVisibleDishes.reduce((acc, d) => acc + (d.ingredients?.length || 0), 0);
+  const totalIngredients = allVisibleDishes.reduce(
+    (acc, d) => acc + (d.ingredients?.length || 0),
+    0
+  );
   const checkedCount = allVisibleDishes.reduce(
-    (acc, d) => acc + (d.ingredients || []).filter((ing) => checkedIngredients.has(`${d.id}-${ing.name}`)).length,
-    0,
+    (acc, d) =>
+      acc +
+      (d.ingredients || []).filter((ing) =>
+        checkedIngredients.has(`${d.id}-${ing.name}`)
+      ).length,
+    0
   );
 
   const total = totalPeople(counts);
   const activeSectionCount = SECTIONS.filter((s) => counts[s.id] > 0).length;
 
+  // ─────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900">
       <Header counts={counts} date={date} />
 
+      {/* Barra de control */}
       <section className="sticky top-0 z-30 bg-stone-50/95 backdrop-blur-md border-b border-stone-200/60">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            
             <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
               <button
                 onClick={() => setShowSectionPanel(true)}
@@ -342,7 +375,8 @@ export default function App() {
                 </div>
                 <div className="flex-1 text-left">
                   <p className="font-bold text-stone-900 text-sm">
-                    {total} comensales · {activeSectionCount} {activeSectionCount === 1 ? 'sección' : 'secciones'}
+                    {total} comensales · {activeSectionCount}{' '}
+                    {activeSectionCount === 1 ? 'sección' : 'secciones'}
                   </p>
                   <p className="text-stone-500 text-xs flex items-center gap-1">
                     <Settings className="w-3 h-3" />
@@ -381,7 +415,8 @@ export default function App() {
                 <Utensils className="w-4 h-4 text-orange-400" />
                 <span>Editar Platos</span>
               </button>
-                            {/* Botón PDF Lista Compra del Día */}
+
+              {/* Botón PDF del Día */}
               <button
                 onClick={() => {
                   const currentDayMenu = menuList.find((m) => m.day === selectedCampDay);
@@ -395,7 +430,7 @@ export default function App() {
                 <span>PDF Día</span>
               </button>
 
-              {/* Botón PDF Lista Compra Global 15 días */}
+              {/* Botón PDF Global 15 días */}
               <button
                 onClick={() => {
                   generateGlobalShoppingPDF(menuList, dishesList, counts);
@@ -428,7 +463,7 @@ export default function App() {
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1.5">
                 <Flame className="w-4 h-4 text-orange-500" />
-                {filteredDishes.length} platos
+                {allVisibleDishes.length} platos
               </span>
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -448,7 +483,7 @@ export default function App() {
         </div>
       </section>
 
-            {/* Galería de platos agrupados por comida */}
+      {/* Galería de platos agrupados por comida */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         {groupedDishes.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-stone-200/80 shadow-sm">
@@ -482,7 +517,7 @@ export default function App() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {dishes.map((dish) => {
                     const dishChecked = (dish.ingredients || []).filter((ing) =>
-                      checkedIngredients.has(`${dish.id}-${ing.name}`),
+                      checkedIngredients.has(`${dish.id}-${ing.name}`)
                     ).length;
                     return (
                       <DishCard
@@ -506,7 +541,7 @@ export default function App() {
               <ChefHat className="w-5 h-5 text-orange-500" />
               <span className="font-semibold">Cocina La Milagrosa 143</span>
             </div>
-            
+
             <div className="flex flex-wrap items-center gap-4">
               <button
                 onClick={forceUploadToCloud}
@@ -533,6 +568,7 @@ export default function App() {
           </div>
         </footer>
       </main>
+
       {showSectionPanel && (
         <SectionPanel
           counts={counts}
