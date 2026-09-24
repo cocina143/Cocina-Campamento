@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import type { Dish, Ingredient } from '@/data/dishes';
+import type { Dish, Ingredient, AllergenId, DietId } from '@/data/dishes';
+import { ALLERGEN_OPTIONS, DIET_OPTIONS } from '@/data/dishes';
 import { searchFreeImage, getFallbackImage } from '@/services/imageService';
-import { Plus, Trash2, X, ChefHat, Search, Loader2 } from 'lucide-react';
+import { Plus, Trash2, X, ChefHat, Search, Loader2, AlertTriangle, Leaf } from 'lucide-react';
 
 interface DishManagerModalProps {
   dishes: Dish[];
@@ -30,6 +31,8 @@ export function DishManagerModal({ dishes, onSaveDishes, onClose }: DishManagerM
       category: 'Plato principal',
       image: '',
       ingredients: [],
+      allergens: [],
+      diets: [],
     });
   };
 
@@ -43,7 +46,6 @@ export function DishManagerModal({ dishes, onSaveDishes, onClose }: DishManagerM
 
   const handleAddIngredient = () => {
     if (!editingDish) return;
-    // ✅ CAMBIO CLAVE: usar 'amount' en lugar de 'amountPerPerson'
     const newIng: Ingredient = { name: '', amount: 0, unit: 'g' };
     setEditingDish({ ...editingDish, ingredients: [...editingDish.ingredients, newIng] });
   };
@@ -61,6 +63,26 @@ export function DishManagerModal({ dishes, onSaveDishes, onClose }: DishManagerM
       ...editingDish,
       ingredients: editingDish.ingredients.filter((_, i) => i !== index),
     });
+  };
+
+  // ─── NUEVO: Toggle de alérgenos ─────────────────────────────
+  const toggleAllergen = (allergenId: AllergenId) => {
+    if (!editingDish) return;
+    const current = editingDish.allergens || [];
+    const updated = current.includes(allergenId)
+      ? current.filter((a) => a !== allergenId)
+      : [...current, allergenId];
+    setEditingDish({ ...editingDish, allergens: updated });
+  };
+
+  // ─── NUEVO: Toggle de dietas ────────────────────────────────
+  const toggleDiet = (dietId: DietId) => {
+    if (!editingDish) return;
+    const current = editingDish.diets || [];
+    const updated = current.includes(dietId)
+      ? current.filter((d) => d !== dietId)
+      : [...current, dietId];
+    setEditingDish({ ...editingDish, diets: updated });
   };
 
   const handleSaveCurrentDish = async () => {
@@ -94,8 +116,7 @@ export function DishManagerModal({ dishes, onSaveDishes, onClose }: DishManagerM
             <X className="w-5 h-5 text-stone-500" />
           </button>
         </div>
-
-        {editingDish ? (
+                {editingDish ? (
           <div className="mt-6 space-y-4">
             <h3 className="font-semibold text-lg">
               {editingDish.name ? `Editar: ${editingDish.name}` : 'Nuevo Plato'}
@@ -145,6 +166,58 @@ export function DishManagerModal({ dishes, onSaveDishes, onClose }: DishManagerM
               </div>
             </div>
 
+            {/* ─── NUEVO: Alérgenos y Dietas ─────────────────────── */}
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                <h4 className="font-bold text-sm text-amber-800">Alérgenos que contiene este plato</h4>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {ALLERGEN_OPTIONS.map((opt) => {
+                  const isActive = (editingDish.allergens || []).includes(opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => toggleAllergen(opt.id)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                        isActive
+                          ? 'bg-red-100 border-red-400 text-red-800 shadow-sm'
+                          : 'bg-white border-stone-200 text-stone-500 hover:border-red-300'
+                      }`}
+                    >
+                      {opt.icon} {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-2 mt-4 mb-3">
+                <Leaf className="w-4 h-4 text-green-600" />
+                <h4 className="font-bold text-sm text-green-800">Apto para dietas</h4>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {DIET_OPTIONS.map((opt) => {
+                  const isActive = (editingDish.diets || []).includes(opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => toggleDiet(opt.id)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                        isActive
+                          ? 'bg-green-100 border-green-400 text-green-800 shadow-sm'
+                          : 'bg-white border-stone-200 text-stone-500 hover:border-green-300'
+                      }`}
+                    >
+                      {opt.icon} {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Ingredientes */}
             <div className="mt-6">
               <div className="flex justify-between items-center mb-3">
                 <h4 className="font-bold text-sm text-stone-800">Ingredientes (por persona)</h4>
@@ -166,7 +239,6 @@ export function DishManagerModal({ dishes, onSaveDishes, onClose }: DishManagerM
                       onChange={(e) => handleUpdateIngredient(idx, 'name', e.target.value)}
                       className="flex-1 border rounded-lg p-2 text-sm"
                     />
-                    {/* ✅ CAMBIO CLAVE: ahora usa 'amount' en lugar de 'amountPerPerson' */}
                     <input
                       type="number"
                       step="0.001"
@@ -240,6 +312,12 @@ export function DishManagerModal({ dishes, onSaveDishes, onClose }: DishManagerM
                       <p className="font-bold text-stone-900">{dish.name}</p>
                       <p className="text-xs text-stone-500">
                         {dish.category} · {dish.ingredients.length} ingredientes
+                        {(dish.allergens?.length || 0) > 0 && (
+                          <span className="text-red-500 font-semibold"> · ⚠️ {dish.allergens.length} alérgenos</span>
+                        )}
+                        {(dish.diets?.length || 0) > 0 && (
+                          <span className="text-green-600 font-semibold"> · 🌱 {dish.diets.length} dietas</span>
+                        )}
                       </p>
                     </div>
                   </div>
