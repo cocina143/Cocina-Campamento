@@ -16,8 +16,7 @@ import { SectionPanel } from '@/components/SectionPanel';
 import type { SectionCounts } from '@/data/sections';
 import { DEFAULT_COUNTS, totalPeople, SECTIONS } from '@/data/sections';
 import { generateDailyShoppingPDF, generateGlobalShoppingPDF } from '@/services/pdfService';
-import { Flame, CheckCircle2, ChefHat, Users, Settings, Utensils, Calendar, Wifi, WifiOff, FileDown, ShoppingBag } from 'lucide-react';
-
+import { Flame, CheckCircle2, ChefHat, Users, Settings, Utensils, Calendar, Wifi, WifiOff, FileDown, ShoppingBag, Coffee, Sun, Apple, Moon } from 'lucide-react';
 type FilterCategory = 'Todos' | 'Plato principal' | 'Especial';
 
 const STORAGE_KEY = 'cocina-campamento-counts';
@@ -289,26 +288,35 @@ export default function App() {
     setCheckedIngredients(new Set());
     try { localStorage.removeItem(CHECKED_KEY); } catch { /* ignore */ }
   };
-    const filteredDishes = useMemo(() => {
+      // Configuración de las 4 comidas con sus iconos
+  const MEAL_CONFIG = [
+    { key: 'desayuno', label: 'Desayuno', icon: Coffee },
+    { key: 'comida', label: 'Comida', icon: Sun },
+    { key: 'merienda', label: 'Merienda', icon: Apple },
+    { key: 'cena', label: 'Cena', icon: Moon },
+  ] as const;
+
+  // Agrupar platos por comida del día seleccionado
+  const groupedDishes = useMemo(() => {
     const currentDayMenu = menuList.find((m) => m.day === selectedCampDay);
     if (!currentDayMenu) return [];
 
-    const activeDishIds = new Set([
-      ...(currentDayMenu.desayuno || []),
-      ...(currentDayMenu.comida || []),
-      ...(currentDayMenu.merienda || []),
-      ...(currentDayMenu.cena || []),
-    ]);
-
-    return dishesList.filter((dish) => {
-      const isPlannedForToday = activeDishIds.has(dish.id) || activeDishIds.has(dish.name);
-      const matchesCategory = filter === 'Todos' || dish.category === filter;
-      return isPlannedForToday && matchesCategory;
-    });
+    return MEAL_CONFIG.map(({ key, label, icon }) => {
+      const dishIds = currentDayMenu[key] || [];
+      const dishes = dishesList.filter((dish) => {
+        const isPlanned = dishIds.includes(dish.id) || dishIds.includes(dish.name);
+        const matchesCategory = filter === 'Todos' || dish.category === filter;
+        return isPlanned && matchesCategory;
+      });
+      return { key, label, icon, dishes };
+    }).filter((group) => group.dishes.length > 0);
   }, [selectedCampDay, menuList, dishesList, filter]);
 
-  const totalIngredients = filteredDishes.reduce((acc, d) => acc + (d.ingredients?.length || 0), 0);
-  const checkedCount = filteredDishes.reduce(
+  // Lista plana para los contadores
+  const allVisibleDishes = groupedDishes.flatMap((g) => g.dishes);
+
+  const totalIngredients = allVisibleDishes.reduce((acc, d) => acc + (d.ingredients?.length || 0), 0);
+  const checkedCount = allVisibleDishes.reduce(
     (acc, d) => acc + (d.ingredients || []).filter((ing) => checkedIngredients.has(`${d.id}-${ing.name}`)).length,
     0,
   );
@@ -440,8 +448,9 @@ export default function App() {
         </div>
       </section>
 
+            {/* Galería de platos agrupados por comida */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        {filteredDishes.length === 0 ? (
+        {groupedDishes.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-stone-200/80 shadow-sm">
             <Utensils className="w-12 h-12 text-stone-300 mx-auto mb-3" />
             <h3 className="text-lg font-bold text-stone-800">No hay platos programados</h3>
@@ -457,21 +466,37 @@ export default function App() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredDishes.map((dish) => {
-              const dishChecked = (dish.ingredients || []).filter((ing) =>
-                checkedIngredients.has(`${dish.id}-${ing.name}`),
-              ).length;
-              return (
-                <DishCard
-                  key={dish.id}
-                  dish={dish}
-                  counts={counts}
-                  checkedCount={dishChecked}
-                  onClick={() => setSelectedDish(dish)}
-                />
-              );
-            })}
+          <div className="space-y-10">
+            {groupedDishes.map(({ key, label, icon: MealIcon, dishes }) => (
+              <section key={key}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+                    <MealIcon className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <h2 className="text-lg font-bold text-stone-900">{label}</h2>
+                  <span className="text-xs bg-orange-100 text-orange-700 px-2.5 py-0.5 rounded-full font-semibold">
+                    {dishes.length} {dishes.length === 1 ? 'plato' : 'platos'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {dishes.map((dish) => {
+                    const dishChecked = (dish.ingredients || []).filter((ing) =>
+                      checkedIngredients.has(`${dish.id}-${ing.name}`),
+                    ).length;
+                    return (
+                      <DishCard
+                        key={dish.id}
+                        dish={dish}
+                        counts={counts}
+                        checkedCount={dishChecked}
+                        onClick={() => setSelectedDish(dish)}
+                      />
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         )}
 
@@ -508,7 +533,6 @@ export default function App() {
           </div>
         </footer>
       </main>
-
       {showSectionPanel && (
         <SectionPanel
           counts={counts}
