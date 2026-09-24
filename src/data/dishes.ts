@@ -1,9 +1,28 @@
 import { supabase } from '@/lib/supabase';
 
+// ─── Alérgenos y etiquetas dietéticas disponibles ─────────────
+export const ALLERGEN_OPTIONS = [
+  { id: 'gluten', label: 'Gluten', icon: '🌾' },
+  { id: 'lactosa', label: 'Lactosa', icon: '🥛' },
+  { id: 'huevo', label: 'Huevo', icon: '🥚' },
+  { id: 'pescado', label: 'Pescado', icon: '🐟' },
+  { id: 'marisco', label: 'Marisco', icon: '🦐' },
+  { id: 'frutos_secos', label: 'Frutos secos', icon: '🥜' },
+  { id: 'soja', label: 'Soja', icon: '🫘' },
+] as const;
+
+export const DIET_OPTIONS = [
+  { id: 'vegetariano', label: 'Vegetariano', icon: '🥬' },
+  { id: 'vegano', label: 'Vegano', icon: '🌱' },
+] as const;
+
+export type AllergenId = typeof ALLERGEN_OPTIONS[number]['id'];
+export type DietId = typeof DIET_OPTIONS[number]['id'];
+
+// ─── Interfaces ────────────────────────────────────────────────
 export interface Ingredient {
   name: string;
   amount: number;
-  amountPerPerson: number; // ← Compatibilidad con DishManagerModal
   unit: string;
 }
 
@@ -13,6 +32,8 @@ export interface Dish {
   category: 'Plato principal' | 'Especial';
   image: string;
   ingredients: Ingredient[];
+  allergens: AllergenId[];   // ← NUEVO: alérgenos que contiene
+  diets: DietId[];           // ← NUEVO: apto para vegetariano/vegano
 }
 
 export const INITIAL_DISHES: Dish[] = [
@@ -22,13 +43,15 @@ export const INITIAL_DISHES: Dish[] = [
     category: 'Plato principal',
     image: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=600',
     ingredients: [
-      { name: 'Macarrones', amount: 100, amountPerPerson: 100, unit: 'g' },
-      { name: 'Carne picada mixta', amount: 80, amountPerPerson: 80, unit: 'g' },
-      { name: 'Tomate frito', amount: 100, amountPerPerson: 100, unit: 'g' },
-      { name: 'Cebolla', amount: 20, amountPerPerson: 20, unit: 'g' },
-      { name: 'Queso rallado', amount: 15, amountPerPerson: 15, unit: 'g' },
-      { name: 'Aceite de oliva', amount: 10, amountPerPerson: 10, unit: 'ml' },
+      { name: 'Macarrones', amount: 100, unit: 'g' },
+      { name: 'Carne picada mixta', amount: 80, unit: 'g' },
+      { name: 'Tomate frito', amount: 100, unit: 'g' },
+      { name: 'Cebolla', amount: 20, unit: 'g' },
+      { name: 'Queso rallado', amount: 15, unit: 'g' },
+      { name: 'Aceite de oliva', amount: 10, unit: 'ml' },
     ],
+    allergens: ['gluten', 'lactosa'],
+    diets: [],
   },
   {
     id: 'lentejas-verduras',
@@ -36,13 +59,15 @@ export const INITIAL_DISHES: Dish[] = [
     category: 'Plato principal',
     image: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=600',
     ingredients: [
-      { name: 'Lentejas pardinas', amount: 80, amountPerPerson: 80, unit: 'g' },
-      { name: 'Zanahoria', amount: 30, amountPerPerson: 30, unit: 'g' },
-      { name: 'Patata', amount: 50, amountPerPerson: 50, unit: 'g' },
-      { name: 'Cebolla', amount: 20, amountPerPerson: 20, unit: 'g' },
-      { name: 'Pimiento verde', amount: 15, amountPerPerson: 15, unit: 'g' },
-      { name: 'Chorizo', amount: 25, amountPerPerson: 25, unit: 'g' },
+      { name: 'Lentejas pardinas', amount: 80, unit: 'g' },
+      { name: 'Zanahoria', amount: 30, unit: 'g' },
+      { name: 'Patata', amount: 50, unit: 'g' },
+      { name: 'Cebolla', amount: 20, unit: 'g' },
+      { name: 'Pimiento verde', amount: 15, unit: 'g' },
+      { name: 'Chorizo', amount: 25, unit: 'g' },
     ],
+    allergens: [],
+    diets: [],
   },
   {
     id: 'pollo-empanado',
@@ -50,12 +75,14 @@ export const INITIAL_DISHES: Dish[] = [
     category: 'Plato principal',
     image: 'https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=600',
     ingredients: [
-      { name: 'Pechuga de pollo', amount: 150, amountPerPerson: 150, unit: 'g' },
-      { name: 'Pan rallado', amount: 30, amountPerPerson: 30, unit: 'g' },
-      { name: 'Huevo', amount: 0.5, amountPerPerson: 0.5, unit: 'ud' },
-      { name: 'Patatas', amount: 150, amountPerPerson: 150, unit: 'g' },
-      { name: 'Aceite para freír', amount: 30, amountPerPerson: 30, unit: 'ml' },
+      { name: 'Pechuga de pollo', amount: 150, unit: 'g' },
+      { name: 'Pan rallado', amount: 30, unit: 'g' },
+      { name: 'Huevo', amount: 0.5, unit: 'ud' },
+      { name: 'Patatas', amount: 150, unit: 'g' },
+      { name: 'Aceite para freír', amount: 30, unit: 'ml' },
     ],
+    allergens: ['gluten', 'huevo'],
+    diets: [],
   },
 ];
 
@@ -63,7 +90,7 @@ export const INITIAL_DISHES: Dish[] = [
 export async function getDishesFromSupabase(): Promise<Dish[]> {
   const { data, error } = await supabase
     .from('dishes')
-    .select('id, name, category, image, ingredients')
+    .select('id, name, category, image, ingredients, allergens, diets')
     .order('name');
 
   if (error) {
@@ -76,19 +103,18 @@ export async function getDishesFromSupabase(): Promise<Dish[]> {
     name: d.name,
     category: d.category,
     image: d.image,
-    // ✅ Devolvemos AMBOS campos para compatibilidad total
     ingredients: (Array.isArray(d.ingredients) ? d.ingredients : []).map((ing: any) => ({
       name: ing.name || '',
       amount: Number(ing.amount ?? ing.amountPerPerson) || 0,
-      amountPerPerson: Number(ing.amount ?? ing.amountPerPerson) || 0,
       unit: ing.unit || 'g',
     })),
+    allergens: Array.isArray(d.allergens) ? d.allergens : [],
+    diets: Array.isArray(d.diets) ? d.diets : [],
   }));
 }
 
 // 2. GUARDAR / ACTUALIZAR UN PLATO
 export async function saveDishToSupabase(dish: Dish): Promise<void> {
-  // ✅ Leemos tanto 'amount' como 'amountPerPerson' para máxima compatibilidad
   const formattedIngredients = (dish.ingredients || []).map((ing: any) => ({
     name: ing.name ? ing.name.trim() : '',
     amount: Number(ing.amount ?? ing.amountPerPerson) || 0,
@@ -103,6 +129,8 @@ export async function saveDishToSupabase(dish: Dish): Promise<void> {
       category: dish.category,
       image: dish.image,
       ingredients: formattedIngredients,
+      allergens: dish.allergens || [],
+      diets: dish.diets || [],
       updated_at: new Date().toISOString(),
     });
 
@@ -119,7 +147,6 @@ export function calculateTotalIngredients(selectedDishes: Dish[], totalPeople: n
     (dish.ingredients || []).forEach((ing: any) => {
       const cleanName = ing.name ? ing.name.trim() : '';
       if (!cleanName) return;
-      // ✅ Leemos ambos campos
       const qty = Number(ing.amount ?? ing.amountPerPerson) || 0;
       const key = `${cleanName.toLowerCase()}_${ing.unit.toLowerCase()}`;
       if (totals[key]) {
