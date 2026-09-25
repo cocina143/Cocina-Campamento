@@ -12,14 +12,29 @@ interface DishModalProps {
 }
 
 function formatAmount(amount: number, unit: string): { value: string; unit: string } {
-  if (unit === 'g' && amount >= 1000) {
-    const kg = amount / 1000;
-    return { value: kg % 1 === 0 ? String(kg) : kg.toFixed(2), unit: 'kg' };
+  // Para unidades (ud, huevos, etc.): mostrar el valor exacto, sin redondeos
+  if (unit === 'ud') {
+    return { value: String(amount), unit: 'ud' };
   }
-  if (unit === 'ml' && amount >= 1000) {
-    const l = amount / 1000;
-    return { value: l % 1 === 0 ? String(l) : l.toFixed(2), unit: 'L' };
+  // Para gramos: convertir a kg con 1 decimal si >= 1000
+  if (unit === 'g') {
+    if (amount >= 1000) {
+      const kg = amount / 1000;
+      return { value: kg % 1 === 0 ? String(kg) : kg.toFixed(1), unit: 'kg' };
+    }
+    const rounded = amount % 1 === 0 ? String(amount) : amount.toFixed(1);
+    return { value: rounded, unit: 'g' };
   }
+  // Para ml: convertir a L con 1 decimal si >= 1000
+  if (unit === 'ml') {
+    if (amount >= 1000) {
+      const l = amount / 1000;
+      return { value: l % 1 === 0 ? String(l) : l.toFixed(1), unit: 'L' };
+    }
+    const rounded = amount % 1 === 0 ? String(amount) : amount.toFixed(1);
+    return { value: rounded, unit: 'ml' };
+  }
+  // Para kg o L ya definidos: mostrar tal cual con 1 decimal si hace falta
   const rounded = amount % 1 === 0 ? String(amount) : amount.toFixed(1);
   return { value: rounded, unit };
 }
