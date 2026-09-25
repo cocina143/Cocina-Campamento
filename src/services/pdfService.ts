@@ -3,7 +3,9 @@ import autoTable from 'jspdf-autotable';
 import type { Dish } from '@/data/dishes';
 import type { DayMenu } from '@/data/menu';
 import type { SectionCounts } from '@/data/sections';
+import type { Persona, TipoDieta } from '@/data/personas';
 import { totalPeople } from '@/data/sections';
+import { getTotalPersonasConDieta, esIncompatibleConDieta } from '@/data/personas';
 
 interface ConsolidatedItem {
   name: string;
@@ -45,16 +47,46 @@ function formatQty(amount: number, unit: string): string {
   return `${rounded} ${unit}`;
 }
 
+function getDietaDelPlato(dish: Dish): TipoDieta | null {
+  if (dish.diets?.includes('vegano')) return 'Vegano';
+  if (dish.diets?.includes('vegetariano')) return 'Vegetariano';
+  const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
+  const tieneNoHalal = dish.ingredients?.some((ing) =>
+    noHalal.some((nh) => ing.name.toLowerCase().includes(nh))
+  );
+  if (!tieneNoHalal && dish.name.toLowerCase().includes('halal')) return 'Halal';
+  return null;
+}
+
+function getPersonasEfectivasParaPlato(dish: Dish, counts: SectionCounts, personas: Persona[]): number {
+  const dietaDelPlato = getDietaDelPlato(dish);
+  
+  if (dietaDelPlato) {
+    return getTotalPersonasConDieta(counts, personas, dietaDelPlato);
+  }
+  
+  // Plato General: calcular para todos MENOS los que no pueden comerlo
+  const total = totalPeople(counts);
+  let personasQueNoPueden = 0;
+  
+  personas.forEach((p) => {
+    if (p.dieta !== 'General' && esIncompatibleConDieta(dish, p.dieta)) {
+      personasQueNoPueden++;
+    }
+  });
+  
+  return Math.max(0, total - personasQueNoPueden);
+}
+
 export function generateDailyShoppingPDF(
   dayMenu: DayMenu,
   allDishes: Dish[],
   counts: SectionCounts,
+  personas: Persona[] = [],
   campName: string = 'Cocina La Milagrosa 143'
 ): void {
   const doc = new jsPDF();
-  const comensales = totalPeople(counts);
 
-  // Cabecera
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
   doc.text(campName, 14, 20);
@@ -66,11 +98,10 @@ export function generateDailyShoppingPDF(
 
   doc.setFontSize(11);
   doc.setTextColor(60, 60, 60);
-  doc.text(`Comensales: ${comensales} personas`, 14, 35);
+  doc.text(`Comensales totales: ${totalPeople(counts)} personas`, 14, 35);
 
   let currentY = 44;
 
-  // Secciones por turno de comida
   const meals: { key: 'desayuno' | 'comida' | 'merienda' | 'cena'; label: string }[] = [
     { key: 'desayuno', label: 'DESAYUNO' },
     { key: 'comida', label: 'COMIDA' },
@@ -82,17 +113,12 @@ export function generateDailyShoppingPDF(
     const mealDishes = getDishesForMeal(dayMenu, meal.key, allDishes);
     if (mealDishes.length === 0) return;
 
-    const mealIngredients = consolidateIngredients(mealDishes, comensales);
-    if (mealIngredients.length === 0) return;
-
-    // Título del turno
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(234, 88, 12);
     doc.text(meal.label, 14, currentY);
     currentY += 2;
 
-    // Lista de platos de este turno
     doc.setFontSize(9);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(100, 100, 100);
@@ -100,40 +126,65 @@ export function generateDailyShoppingPDF(
     doc.text(`Platos: ${dishNames}`, 14, currentY + 4);
     currentY += 8;
 
-    // Tabla de ingredientes de este turno
-    autoTable(doc, {
-      startY: currentY,
-      head: [['Ingrediente', 'Cantidad', 'Unidad']],
-      body: mealIngredients.map((item) => [
-        item.name,
-        formatQty(item.amount, item.unit),
-        item.unit,
-      ]),
-      theme: 'grid',
-      headStyles: {
-        fillColor: [251, 146, 60],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        fontSize: 9,
-      },
-      alternateRowStyles: {
-        fillColor: [255, 247, 237],
-      },
-      styles: {
-        fontSize: 9,
-        cellPadding: 3,
-      },
-      columnStyles: {
-        0: { cellWidth: 100 },
-        1: { cellWidth: 45, halign: 'right' },
-        2: { cellWidth: 30, halign: 'center' },
-      },
-      didDrawPage: (data) => {
-        currentY = data.cursor.y + 8;
-      },
+    // Agrupar platos por tipo de dieta
+    const platosPorDieta: Record<string, { platos: Dish[]; comensales: number }> = {};
+    
+    mealDishes.forEach((dish) => {
+      const dieta = getDietaDelPlato(dish) || 'General';
+      const comensales = getPersonasEfectivasParaPlato(dish, counts, personas);
+      
+      if (!platosPorDieta[dieta]) {
+        platosPorDieta[dieta] = { platos: [], comensales: 0 };
+      }
+      platosPorDieta[dieta].platos.push(dish);
+      platosPorDieta[dieta].comensales = Math.max(platosPorDieta[dieta].comensales, comensales);
     });
 
-    currentY += 4;
+    // Generar tabla para cada grupo de dieta
+    Object.entries(platosPorDieta).forEach(([dieta, data]) => {
+      const mealIngredients = consolidateIngredients(data.platos, data.comensales);
+      if (mealIngredients.length === 0) return;
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(60, 60, 60);
+      doc.text(`${dieta} (${data.comensales} comensales)`, 14, currentY);
+      currentY += 5;
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Ingrediente', 'Cantidad', 'Unidad']],
+        body: mealIngredients.map((item) => [
+          item.name,
+          formatQty(item.amount, item.unit),
+          item.unit,
+        ]),
+        theme: 'grid',
+        headStyles: {
+          fillColor: [251, 146, 60],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 9,
+        },
+        alternateRowStyles: {
+          fillColor: [255, 247, 237],
+        },
+        styles: {
+          fontSize: 9,
+          cellPadding: 3,
+        },
+        columnStyles: {
+          0: { cellWidth: 100 },
+          1: { cellWidth: 45, halign: 'right' },
+          2: { cellWidth: 30, halign: 'center' },
+        },
+        didDrawPage: (data) => {
+          currentY = data.cursor.y + 8;
+        },
+      });
+
+      currentY += 4;
+    });
   });
 
   // Resumen consolidado de todo el día
@@ -143,20 +194,41 @@ export function generateDailyShoppingPDF(
     ...getDishesForMeal(dayMenu, 'merienda', allDishes),
     ...getDishesForMeal(dayMenu, 'cena', allDishes),
   ];
-  const globalIngredients = consolidateIngredients(allDayDishes, comensales);
 
-  if (globalIngredients.length > 0) {
-    // Salto de página si es necesario
-    if (currentY > 220) {
-      doc.addPage();
-      currentY = 20;
+  // Agrupar todos los platos del día por dieta
+  const todosPlatosPorDieta: Record<string, { platos: Dish[]; comensales: number }> = {};
+  
+  allDayDishes.forEach((dish) => {
+    const dieta = getDietaDelPlato(dish) || 'General';
+    const comensales = getPersonasEfectivasParaPlato(dish, counts, personas);
+    
+    if (!todosPlatosPorDieta[dieta]) {
+      todosPlatosPorDieta[dieta] = { platos: [], comensales: 0 };
     }
+    todosPlatosPorDieta[dieta].platos.push(dish);
+    todosPlatosPorDieta[dieta].comensales = Math.max(todosPlatosPorDieta[dieta].comensales, comensales);
+  });
 
-    doc.setFontSize(14);
+  if (currentY > 220) {
+    doc.addPage();
+    currentY = 20;
+  }
+
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(234, 88, 12);
+  doc.text('RESUMEN TOTAL DEL DÍA', 14, currentY);
+  currentY += 8;
+
+  Object.entries(todosPlatosPorDieta).forEach(([dieta, data]) => {
+    const globalIngredients = consolidateIngredients(data.platos, data.comensales);
+    if (globalIngredients.length === 0) return;
+
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(234, 88, 12);
-    doc.text('RESUMEN TOTAL DEL DÍA', 14, currentY);
-    currentY += 8;
+    doc.setTextColor(60, 60, 60);
+    doc.text(`${dieta} (${data.comensales} comensales)`, 14, currentY);
+    currentY += 5;
 
     autoTable(doc, {
       startY: currentY,
@@ -185,10 +257,14 @@ export function generateDailyShoppingPDF(
         1: { cellWidth: 50, halign: 'right' },
         2: { cellWidth: 30, halign: 'center' },
       },
+      didDrawPage: (data) => {
+        currentY = data.cursor.y + 8;
+      },
     });
-  }
 
-  // Pie de página
+    currentY += 4;
+  });
+
   const pageCount = (doc as any).lastAutoTable.pageCount || 1;
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -213,6 +289,7 @@ export function generateGlobalShoppingPDF(
   menuList: DayMenu[],
   allDishes: Dish[],
   counts: SectionCounts,
+  personas: Persona[] = [],
   campName: string = 'Cocina La Milagrosa 143'
 ): void {
   const doc = new jsPDF();
@@ -231,7 +308,8 @@ export function generateGlobalShoppingPDF(
   doc.setTextColor(60, 60, 60);
   doc.text(`Comensales base: ${defaultComensales} personas`, 14, 35);
 
-  const globalMap = new Map<string, ConsolidatedItem>();
+  // Agrupar todos los platos de los 15 días por dieta
+  const globalPorDieta: Record<string, { platos: Dish[]; comensales: number }> = {};
 
   menuList.forEach((dayMenu) => {
     const allMeals = [
@@ -241,57 +319,83 @@ export function generateGlobalShoppingPDF(
       ...(dayMenu.cena || []),
     ];
     const dayDishes = allDishes.filter((d) => allMeals.includes(d.id) || allMeals.includes(d.name));
+    
     dayDishes.forEach((dish) => {
-      (dish.ingredients || []).forEach((ing) => {
-        const cleanName = ing.name ? ing.name.trim() : '';
-        if (!cleanName) return;
-        const key = `${cleanName.toLowerCase()}_${ing.unit.toLowerCase()}`;
-        const qty = Number(ing.amount) || 0;
-        if (globalMap.has(key)) {
-          globalMap.get(key)!.amount += qty * defaultComensales;
-        } else {
-          globalMap.set(key, { name: cleanName, amount: qty * defaultComensales, unit: ing.unit || 'g' });
-        }
-      });
+      const dieta = getDietaDelPlato(dish) || 'General';
+      const comensales = getPersonasEfectivasParaPlato(dish, counts, personas);
+      
+      if (!globalPorDieta[dieta]) {
+        globalPorDieta[dieta] = { platos: [], comensales: 0 };
+      }
+      globalPorDieta[dieta].platos.push(dish);
+      globalPorDieta[dieta].comensales = Math.max(globalPorDieta[dieta].comensales, comensales);
     });
   });
 
-  const globalItems = Array.from(globalMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  let currentY = 44;
 
-  autoTable(doc, {
-    startY: 44,
-    head: [['Ingrediente', 'Cantidad Total (15 días)', 'Unidad']],
-    body: globalItems.map((item) => [
-      item.name,
-      formatQty(item.amount, item.unit),
-      item.unit,
-    ]),
-    theme: 'grid',
-    headStyles: {
-      fillColor: [234, 88, 12],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-    },
-    alternateRowStyles: {
-      fillColor: [255, 247, 237],
-    },
-    styles: {
-      fontSize: 10,
-      cellPadding: 4,
-    },
-    columnStyles: {
-      0: { cellWidth: 100 },
-      1: { cellWidth: 50, halign: 'right' },
-      2: { cellWidth: 30, halign: 'center' },
-    },
+  Object.entries(globalPorDieta).forEach(([dieta, data]) => {
+    const globalItems = consolidateIngredients(data.platos, data.comensales);
+    if (globalItems.length === 0) return;
+
+    if (currentY > 220) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(60, 60, 60);
+    doc.text(`${dieta} (${data.comensales} comensales)`, 14, currentY);
+    currentY += 5;
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [['Ingrediente', 'Cantidad Total (15 días)', 'Unidad']],
+      body: globalItems.map((item) => [
+        item.name,
+        formatQty(item.amount, item.unit),
+        item.unit,
+      ]),
+      theme: 'grid',
+      headStyles: {
+        fillColor: [234, 88, 12],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [255, 247, 237],
+      },
+      styles: {
+        fontSize: 10,
+        cellPadding: 4,
+      },
+      columnStyles: {
+        0: { cellWidth: 100 },
+        1: { cellWidth: 50, halign: 'right' },
+        2: { cellWidth: 30, halign: 'center' },
+      },
+      didDrawPage: (data) => {
+        currentY = data.cursor.y + 8;
+      },
+    });
+
+    currentY += 4;
   });
 
   const finalY = (doc as any).lastAutoTable.finalY + 12;
 
+  if (finalY > 220) {
+    doc.addPage();
+    currentY = 20;
+  } else {
+    currentY = finalY;
+  }
+
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(200, 80, 0);
-  doc.text('Resumen de Menú por Día', 14, finalY);
+  doc.text('Resumen de Menú por Día', 14, currentY);
 
   const resumenRows: string[][] = menuList.map((dayMenu) => {
     const allMeals = [
@@ -308,7 +412,7 @@ export function generateGlobalShoppingPDF(
   });
 
   autoTable(doc, {
-    startY: finalY + 5,
+    startY: currentY + 5,
     head: [['Día', 'Platos', 'Comensales']],
     body: resumenRows,
     theme: 'striped',
