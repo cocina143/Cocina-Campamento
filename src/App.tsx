@@ -481,11 +481,11 @@ export default function App() {
                 </div>
                 <div className="flex-1 text-left">
                   <p className="font-bold text-stone-900 text-sm">
-                    {personasList.length} {personasList.length === 1 ? 'persona' : 'personas'} con alergias
+                                       {personasList.length} {personasList.length === 1 ? 'persona' : 'personas'} con Alergias/Dietas
                   </p>
                   <p className="text-stone-500 text-xs flex items-center gap-1">
                     <Settings className="w-3 h-3" />
-                    Gestionar alergias
+                      Gestionar alergias y dietas
                   </p>
                 </div>
               </button>
