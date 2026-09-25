@@ -2,6 +2,8 @@ import { X, CheckCircle2 } from 'lucide-react';
 import type { Dish } from '@/data/dishes';
 import type { SectionCounts } from '@/data/sections';
 import { SECTIONS, effectiveMultiplier } from '@/data/sections';
+import type { Persona, TipoDieta } from '@/data/personas';
+import { getDesglosePorSeccionParaDieta, getTotalPersonasConDieta } from '@/data/personas';
 
 interface DishModalProps {
   dish: Dish;
@@ -9,6 +11,7 @@ interface DishModalProps {
   checkedIngredients: Set<string>;
   onToggleIngredient: (key: string) => void;
   onClose: () => void;
+  personas?: Persona[];
 }
 
 function formatAmount(amount: number, unit: string): { value: string; unit: string } {
@@ -36,18 +39,54 @@ function formatAmount(amount: number, unit: string): { value: string; unit: stri
   return { value: rounded, unit };
 }
 
-// Calcula el "total real" aplicando los multiplicadores de cada sección
-function getRealTotal(counts: SectionCounts): number {
-  return SECTIONS.reduce((acc, s) => {
-    const count = counts[s.id] || 0;
-    const multiplier = effectiveMultiplier(s);
-    return acc + count * multiplier;
-  }, 0);
+// Determina qué dieta aplica a este plato
+function getDietaDelPlato(dish: Dish): TipoDieta | null {
+  if (dish.diets?.includes('vegano')) return 'Vegano';
+  if (dish.diets?.includes('vegetariano')) return 'Vegetariano';
+  // Detectar Halal por ingredientes
+  const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
+  const tieneNoHalal = dish.ingredients?.some((ing) =>
+    noHalal.some((nh) => ing.name.toLowerCase().includes(nh))
+  );
+  if (dish.diets?.includes('halal' as any) || (!tieneNoHalal && dish.name.toLowerCase().includes('halal'))) {
+    return 'Halal';
+  }
+  return null;
 }
 
-export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient, onClose }: DishModalProps) {
-  const realTotal = getRealTotal(counts);
-  const totalPersonas = SECTIONS.reduce((acc, s) => acc + (counts[s.id] || 0), 0);
+export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient, onClose, personas = [] }: DishModalProps) {
+  const dietaDelPlato = getDietaDelPlato(dish);
+
+  // Calcular desglose según la dieta del plato
+  let desglose: { sectionId: string; sectionName: string; count: number; multiplier: number; effectiveCount: number }[];
+  let totalEfectivo: number;
+  let tituloDieta: string;
+
+  if (dietaDelPlato) {
+    // Plato con dieta específica: calcular solo para personas con esa dieta
+    desglose = getDesglosePorSeccionParaDieta(counts, personas, dietaDelPlato);
+    totalEfectivo = getTotalPersonasConDieta(counts, personas, dietaDelPlato);
+    tituloDieta = `${dietaDelPlato.toUpperCase()} (${totalEfectivo.toFixed(1)} raciones)`;
+  } else {
+    // Plato General: calcular para todos MENOS los que tienen dieta especial
+    desglose = SECTIONS.map((s) => {
+      const totalSeccion = counts[s.id] || 0;
+      const personasConDietaEspecial = personas.filter(
+        (p) => p.seccion === s.id && p.dieta !== 'General'
+      ).length;
+      const personasGeneral = Math.max(0, totalSeccion - personasConDietaEspecial);
+      const multiplier = effectiveMultiplier(s);
+      return {
+        sectionId: s.id,
+        sectionName: s.shortName,
+        count: personasGeneral,
+        multiplier,
+        effectiveCount: personasGeneral * multiplier,
+      };
+    }).filter((item) => item.count > 0);
+    totalEfectivo = desglose.reduce((acc, item) => acc + item.effectiveCount, 0);
+    tituloDieta = `GENERAL (${totalEfectivo.toFixed(1)} raciones)`;
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -67,16 +106,27 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
           <div>
             <h3 className="text-sm font-bold text-stone-500 uppercase tracking-wider mb-3 flex items-center gap-2 flex-wrap">
               Ingredientes y Cantidades
-              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full normal-case">
-                {totalPersonas} comensales ({realTotal.toFixed(1)} raciones efectivas)
+              <span className={`text-xs px-2 py-0.5 rounded-full normal-case font-bold ${
+                dietaDelPlato === 'Halal' ? 'bg-blue-100 text-blue-800' :
+                dietaDelPlato === 'Vegetariano' ? 'bg-green-100 text-green-800' :
+                dietaDelPlato === 'Vegano' ? 'bg-emerald-100 text-emerald-800' :
+                'bg-stone-100 text-stone-700'
+              }`}>
+                {tituloDieta}
               </span>
             </h3>
+
+            {totalEfectivo === 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-xs text-amber-800">
+                ⚠️ No hay personas con dieta <strong>{dietaDelPlato}</strong> asignadas a ninguna sección. Las cantidades serán 0.
+              </div>
+            )}
 
             <div className="space-y-4">
               {(dish.ingredients || []).map((ing, idx) => {
                 const isChecked = checkedIngredients.has(`${dish.id}-${ing.name}`);
                 const amountPerPerson = Number(ing.amount) || 0;
-                const totalAmount = amountPerPerson * realTotal;
+                const totalAmount = amountPerPerson * totalEfectivo;
                 const formattedTotal = formatAmount(totalAmount, ing.unit);
 
                 return (
@@ -97,15 +147,16 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
                     </div>
 
                     <div className="flex flex-col gap-1.5 mt-2 pl-8">
-                      {SECTIONS.filter(s => counts[s.id] > 0).map((section) => {
-                        const sectionCount = counts[section.id];
-                        const multiplier = effectiveMultiplier(section);
-                        const sectionTotal = amountPerPerson * sectionCount * multiplier;
-                        if (sectionTotal === 0) return null;
+                      {desglose.map((item) => {
+                        if (item.effectiveCount === 0) return null;
+                        const sectionTotal = amountPerPerson * item.effectiveCount;
                         const formattedSection = formatAmount(sectionTotal, ing.unit);
                         return (
-                          <div key={section.id} className="flex justify-between items-center text-sm bg-white p-2 rounded-lg border border-stone-100">
-                            <span className={`font-semibold ${section.textColor}`}>{section.shortName}</span>
+                          <div key={item.sectionId} className="flex justify-between items-center text-sm bg-white p-2 rounded-lg border border-stone-100">
+                            <span className="font-semibold text-stone-700">
+                              {item.sectionName}
+                              <span className="text-xs text-stone-400 ml-1">({item.count} pers.)</span>
+                            </span>
                             <span className="font-bold text-stone-800">{formattedSection.value} {formattedSection.unit}</span>
                           </div>
                         );
