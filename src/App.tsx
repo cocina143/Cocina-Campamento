@@ -14,7 +14,7 @@ import { MenuPlannerModal } from '@/components/MenuPlannerModal';
 import { Header } from '@/components/Header';
 import { SectionPanel } from '@/components/SectionPanel';
 import { generateDailyShoppingPDF, generateGlobalShoppingPDF } from '@/services/pdfService';
-import { getPersonasFromSupabase, savePersonaToSupabase, detectAllergenConflicts, type Persona } from '@/data/personas';
+import { getPersonasFromSupabase, savePersonaToSupabase, detectAllergenConflicts, type Persona, type TipoDieta } from '@/data/personas';
 import { PeopleManagerModal } from '@/components/PeopleManagerModal';
 import type { SectionCounts } from '@/data/sections';
 import { DEFAULT_COUNTS, totalPeople, SECTIONS } from '@/data/sections';
@@ -23,7 +23,7 @@ import {
   Wifi, WifiOff, FileDown, ShoppingBag, Coffee, Sun, Apple, Moon, AlertTriangle 
 } from 'lucide-react';
 
-type FilterCategory = 'Todos' | 'Plato principal' | 'Especial';
+type FilterCategory = 'General' | 'Halal' | 'Vegetariano';
 
 const STORAGE_KEY = 'cocina-campamento-counts';
 const DATE_KEY = 'cocina-campamento-date';
