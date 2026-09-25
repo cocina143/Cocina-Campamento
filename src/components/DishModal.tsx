@@ -12,9 +12,10 @@ interface DishModalProps {
 }
 
 function formatAmount(amount: number, unit: string): { value: string; unit: string } {
-  // Para unidades (ud, huevos, etc.): mostrar el valor exacto, sin redondeos
+  // Para unidades (ud, huevos, etc.): redondear a 1 decimal máximo
   if (unit === 'ud') {
-    return { value: String(amount), unit: 'ud' };
+    const rounded = amount % 1 === 0 ? String(amount) : amount.toFixed(1);
+    return { value: rounded, unit: 'ud' };
   }
   // Para gramos: convertir a kg con 1 decimal si >= 1000
   if (unit === 'g') {
