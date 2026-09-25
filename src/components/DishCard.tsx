@@ -59,15 +59,11 @@ function getPersonasEfectivas(dish: Dish, counts: SectionCounts, personas: Perso
     return getTotalPersonasConDieta(counts, personas, dietaDelPlato);
   }
   
-  // Plato General: calcular para todos MENOS los que tienen dieta especial
+  // Plato General: calcular para TODAS las personas (no restar nadie)
   let total = 0;
   SECTIONS.forEach((s) => {
     const totalSeccion = counts[s.id] || 0;
-    const personasConDietaEspecial = personas.filter(
-      (p) => p.seccion === s.id && p.dieta !== 'General'
-    ).length;
-    const personasGeneral = Math.max(0, totalSeccion - personasConDietaEspecial);
-    total += personasGeneral * effectiveMultiplier(s);
+    total += totalSeccion * effectiveMultiplier(s);
   });
   return total;
 }
