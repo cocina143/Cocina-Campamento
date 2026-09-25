@@ -1,354 +1,112 @@
-import { useState } from 'react';
-import type { Dish, Ingredient, AllergenId, DietId } from '@/data/dishes';
-import { ALLERGEN_OPTIONS, DIET_OPTIONS } from '@/data/dishes';
-import { searchFreeImage, getFallbackImage } from '@/services/imageService';
-import { Plus, Trash2, X, ChefHat, Search, Loader2, AlertTriangle, Leaf } from 'lucide-react';
+import { X, CheckCircle2 } from 'lucide-react';
+import type { Dish } from '@/data/dishes';
+import type { SectionCounts } from '@/data/sections';
+import { SECTIONS, effectiveMultiplier, totalPeople } from '@/data/sections';
 
-interface DishManagerModalProps {
-  dishes: Dish[];
-  onSaveDishes: (dishes: Dish[]) => void;
+interface DishModalProps {
+  dish: Dish;
+  counts: SectionCounts;
+  checkedIngredients: Set<string>;
+  onToggleIngredient: (key: string) => void;
   onClose: () => void;
 }
 
-export function DishManagerModal({ dishes, onSaveDishes, onClose }: DishManagerModalProps) {
-  const [localDishes, setLocalDishes] = useState<Dish[]>(dishes);
-  const [editingDish, setEditingDish] = useState<Dish | null>(null);
-  const [isSearchingImage, setIsSearchingImage] = useState(false);
-
-  const handleSave = () => {
-    onSaveDishes(localDishes);
-    onClose();
-  };
-
-  const handleDeleteDish = (id: string) => {
-    setLocalDishes((prev) => prev.filter((d) => d.id !== id));
-  };
-
-  const handleNewDish = () => {
-    setEditingDish({
-      id: Date.now().toString(),
-      name: '',
-      category: 'Plato principal',
-      image: '',
-      ingredients: [],
-      allergens: [],
-      diets: [],
-    });
-  };
-
-  const handleAutoSearchImage = async () => {
-    if (!editingDish || !editingDish.name.trim()) return;
-    setIsSearchingImage(true);
-    const imageUrl = await searchFreeImage(editingDish.name);
-    setEditingDish({ ...editingDish, image: imageUrl });
-    setIsSearchingImage(false);
-  };
-
-  const handleAddIngredient = () => {
-    if (!editingDish) return;
-    const newIng: Ingredient = { name: '', amount: 0, unit: 'g' };
-    setEditingDish({ ...editingDish, ingredients: [...editingDish.ingredients, newIng] });
-  };
-
-  const handleUpdateIngredient = (index: number, field: keyof Ingredient, value: any) => {
-    if (!editingDish) return;
-    const updatedIngs = [...editingDish.ingredients];
-    updatedIngs[index] = { ...updatedIngs[index], [field]: value };
-    setEditingDish({ ...editingDish, ingredients: updatedIngs });
-  };
-
-  const handleRemoveIngredient = (index: number) => {
-    if (!editingDish) return;
-    setEditingDish({
-      ...editingDish,
-      ingredients: editingDish.ingredients.filter((_, i) => i !== index),
-    });
-  };
-
-  // ─── NUEVO: Toggle de alérgenos ─────────────────────────────
-  const toggleAllergen = (allergenId: AllergenId) => {
-    if (!editingDish) return;
-    const current = editingDish.allergens || [];
-    const updated = current.includes(allergenId)
-      ? current.filter((a) => a !== allergenId)
-      : [...current, allergenId];
-    setEditingDish({ ...editingDish, allergens: updated });
-  };
-
-  // ─── NUEVO: Toggle de dietas ────────────────────────────────
-  const toggleDiet = (dietId: DietId) => {
-    if (!editingDish) return;
-    const current = editingDish.diets || [];
-    const updated = current.includes(dietId)
-      ? current.filter((d) => d !== dietId)
-      : [...current, dietId];
-    setEditingDish({ ...editingDish, diets: updated });
-  };
-
-  const handleSaveCurrentDish = async () => {
-    if (!editingDish || !editingDish.name.trim()) return;
-    let finalImage = editingDish.image;
-    if (!finalImage || finalImage.trim() === '') {
-      setIsSearchingImage(true);
-      finalImage = await searchFreeImage(editingDish.name);
-      setIsSearchingImage(false);
-    }
-    const dishToSave = { ...editingDish, image: finalImage };
-    setLocalDishes((prev) => {
-      const exists = prev.some((d) => d.id === dishToSave.id);
-      if (exists) {
-        return prev.map((d) => (d.id === dishToSave.id ? dishToSave : d));
-      }
-      return [...prev, dishToSave];
-    });
-    setEditingDish(null);
-  };
+export function DishModal({ 
+  dish, 
+  counts, 
+  checkedIngredients, 
+  onToggleIngredient, 
+  onClose 
+}: DishModalProps) {
+  const total = totalPeople(counts);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
-        <div className="flex items-center justify-between pb-4 border-b border-stone-200">
-          <div className="flex items-center gap-2">
-            <ChefHat className="w-6 h-6 text-orange-600" />
-            <h2 className="text-xl font-bold text-stone-900">Gestor de Platos y Recetas</h2>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-stone-100 rounded-full">
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-2xl sm:rounded-3xl rounded-t-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
+        
+        {/* Cabecera */}
+        <div className="sticky top-0 bg-white z-10 border-b border-stone-200 p-4 flex items-center justify-between rounded-t-3xl">
+          <h2 className="text-xl font-bold text-stone-900 pr-4">{dish.name}</h2>
+          <button onClick={onClose} className="p-2 hover:bg-stone-100 rounded-full flex-shrink-0">
             <X className="w-5 h-5 text-stone-500" />
           </button>
         </div>
-                {editingDish ? (
-          <div className="mt-6 space-y-4">
-            <h3 className="font-semibold text-lg">
-              {editingDish.name ? `Editar: ${editingDish.name}` : 'Nuevo Plato'}
+
+        {/* Imagen del plato */}
+        {dish.image && (
+          <img 
+            src={dish.image} 
+            alt={dish.name} 
+            className="w-full h-48 object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        )}
+
+        {/* Ingredientes y Cantidades */}
+        <div className="p-4 sm:p-6 space-y-6">
+          <div>
+            <h3 className="text-sm font-bold text-stone-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+              Ingredientes y Cantidades 
+              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full normal-case">
+                Total: {total} comensales
+              </span>
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-bold text-stone-600">Nombre del plato</label>
-                <input
-                  type="text"
-                  value={editingDish.name}
-                  onChange={(e) => setEditingDish({ ...editingDish, name: e.target.value })}
-                  placeholder="Ej: Salmorejo"
-                  className="w-full border rounded-xl p-2.5 text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-stone-600">Categoría</label>
-                <select
-                  value={editingDish.category}
-                  onChange={(e) => setEditingDish({ ...editingDish, category: e.target.value as any })}
-                  className="w-full border rounded-xl p-2.5 text-sm"
-                >
-                  <option value="Plato principal">Plato principal</option>
-                  <option value="Especial">Especial</option>
-                </select>
-              </div>
-              <div className="sm:col-span-2">
-                <label className="text-xs font-bold text-stone-600 block mb-1">URL de la Imagen / Foto</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={editingDish.image || ''}
-                    onChange={(e) => setEditingDish({ ...editingDish, image: e.target.value })}
-                    placeholder="Deja en blanco para auto-buscar o pega un enlace..."
-                    className="flex-1 border rounded-xl p-2.5 text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAutoSearchImage}
-                    disabled={isSearchingImage || !editingDish.name.trim()}
-                    className="flex items-center gap-1.5 bg-orange-100 text-orange-700 font-semibold px-3 py-2 rounded-xl text-xs hover:bg-orange-200 transition-all disabled:opacity-50"
-                  >
-                    {isSearchingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    Buscar foto
-                  </button>
-                </div>
-              </div>
-            </div>
+            
+            <div className="space-y-4">
+              {dish.ingredients.map((ing, idx) => {
+                const isChecked = checkedIngredients.has(`${dish.id}-${ing.name}`);
+                // ✅ AQUÍ ESTÁ LA CLAVE: leemos 'amount' como la cantidad por persona
+                const amountPerPerson = Number(ing.amount) || 0;
+                const totalAmount = amountPerPerson * total;
+                
+                return (
+                  <div key={idx} className="bg-stone-50 rounded-xl p-3 border border-stone-100">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2 flex-1">
+                        <button
+                          onClick={() => onToggleIngredient(`${dish.id}-${ing.name}`)}
+                          className={`flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                            isChecked 
+                              ? 'bg-green-500 border-green-500 text-white' 
+                              : 'border-stone-300 text-transparent hover:border-green-400'
+                          }`}
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </button>
+                        <span className={`font-semibold text-stone-900 ${isChecked ? 'line-through text-stone-400' : ''}`}>
+                          {ing.name}
+                        </span>
+                      </div>
+                      <span className="text-sm font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-lg whitespace-nowrap">
+                        {totalAmount % 1 === 0 ? totalAmount : totalAmount.toFixed(1)} {ing.unit}
+                      </span>
+                    </div>
 
-            {/* ─── NUEVO: Alérgenos y Dietas ─────────────────────── */}
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <h4 className="font-bold text-sm text-amber-800">Alérgenos que contiene este plato</h4>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {ALLERGEN_OPTIONS.map((opt) => {
-                  const isActive = (editingDish.allergens || []).includes(opt.id);
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => toggleAllergen(opt.id)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                        isActive
-                          ? 'bg-red-100 border-red-400 text-red-800 shadow-sm'
-                          : 'bg-white border-stone-200 text-stone-500 hover:border-red-300'
-                      }`}
-                    >
-                      {opt.icon} {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
+                    {/* Desglose por sección */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 pl-8">
+                      {SECTIONS.filter(s => counts[s.id] > 0).map((section) => {
+                        const sectionCount = counts[section.id];
+                        const multiplier = effectiveMultiplier(section);
+                        const sectionTotal = amountPerPerson * sectionCount * multiplier;
+                        
+                        if (sectionTotal === 0) return null;
 
-              <div className="flex items-center gap-2 mt-4 mb-3">
-                <Leaf className="w-4 h-4 text-green-600" />
-                <h4 className="font-bold text-sm text-green-800">Apto para dietas</h4>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {DIET_OPTIONS.map((opt) => {
-                  const isActive = (editingDish.diets || []).includes(opt.id);
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => toggleDiet(opt.id)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                        isActive
-                          ? 'bg-green-100 border-green-400 text-green-800 shadow-sm'
-                          : 'bg-white border-stone-200 text-stone-500 hover:border-green-300'
-                      }`}
-                    >
-                      {opt.icon} {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Ingredientes */}
-            <div className="mt-6">
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="font-bold text-sm text-stone-800">Ingredientes (por persona)</h4>
-                <button
-                  type="button"
-                  onClick={handleAddIngredient}
-                  className="flex items-center gap-1 text-xs text-orange-600 font-semibold hover:text-orange-800"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Añadir ingrediente
-                </button>
-              </div>
-              <div className="space-y-2">
-                {editingDish.ingredients.map((ing, idx) => (
-                  <div key={idx} className="flex items-center gap-2 bg-stone-50 p-2 rounded-xl">
-                    <input
-                      type="text"
-                      placeholder="Ingrediente"
-                      value={ing.name}
-                      onChange={(e) => handleUpdateIngredient(idx, 'name', e.target.value)}
-                      className="flex-1 border rounded-lg p-2 text-sm"
-                    />
-                    <input
-                      type="number"
-                      step="0.001"
-                      placeholder="Cant x pers."
-                      value={ing.amount || ''}
-                      onChange={(e) => handleUpdateIngredient(idx, 'amount', parseFloat(e.target.value) || 0)}
-                      className="w-24 border rounded-lg p-2 text-sm"
-                    />
-                    <select
-                      value={ing.unit}
-                      onChange={(e) => handleUpdateIngredient(idx, 'unit', e.target.value)}
-                      className="w-20 border rounded-lg p-2 text-sm"
-                    >
-                      <option value="kg">kg</option>
-                      <option value="g">g</option>
-                      <option value="L">L</option>
-                      <option value="ml">ml</option>
-                      <option value="ud">ud</option>
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveIngredient(idx)}
-                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-4">
-              <button
-                type="button"
-                onClick={handleSaveCurrentDish}
-                disabled={isSearchingImage}
-                className="flex-1 bg-orange-600 text-white font-bold py-2.5 rounded-xl hover:bg-orange-700 transition-all disabled:opacity-50"
-              >
-                {isSearchingImage && <Loader2 className="w-4 h-4 animate-spin inline mr-2" />}
-                Guardar este plato
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditingDish(null)}
-                className="px-4 border rounded-xl hover:bg-stone-100"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-4 space-y-4">
-            <button
-              type="button"
-              onClick={handleNewDish}
-              className="w-full flex items-center justify-center gap-2 bg-orange-50 border border-orange-200 text-orange-700 font-bold py-3 rounded-2xl hover:bg-orange-100 transition-all"
-            >
-              <Plus className="w-5 h-5" /> Crear un nuevo plato personalizado
-            </button>
-            <div className="divide-y divide-stone-100 max-h-[50vh] overflow-y-auto">
-              {localDishes.map((dish) => (
-                <div key={dish.id} className="py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={dish.image || getFallbackImage(dish.name)}
-                      alt={dish.name}
-                      onError={(e) => { (e.target as HTMLImageElement).src = getFallbackImage(dish.name); }}
-                      className="w-10 h-10 rounded-lg object-cover bg-stone-100"
-                    />
-                    <div>
-                      <p className="font-bold text-stone-900">{dish.name}</p>
-                      <p className="text-xs text-stone-500">
-                        {dish.category} · {dish.ingredients.length} ingredientes
-                        {(dish.allergens?.length || 0) > 0 && (
-                          <span className="text-red-500 font-semibold"> · ⚠️ {dish.allergens.length} alérgenos</span>
-                        )}
-                        {(dish.diets?.length || 0) > 0 && (
-                          <span className="text-green-600 font-semibold"> · 🌱 {dish.diets.length} dietas</span>
-                        )}
-                      </p>
+                        return (
+                          <div key={section.id} className="flex justify-between text-xs text-stone-600 bg-white p-1.5 rounded border border-stone-100">
+                            <span className="font-medium">{section.shortName}</span>
+                            <span className="font-bold text-stone-800">
+                              {sectionTotal % 1 === 0 ? sectionTotal : sectionTotal.toFixed(1)} {ing.unit}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setEditingDish(dish)}
-                      className="text-xs bg-stone-100 font-semibold px-3 py-1.5 rounded-lg hover:bg-stone-200"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteDish(dish.id)}
-                      className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-            <button
-              type="button"
-              onClick={handleSave}
-              className="w-full bg-stone-900 text-white font-bold py-3 rounded-2xl hover:bg-stone-800 transition-all"
-            >
-              Guardar y actualizar menú de la app
-            </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
