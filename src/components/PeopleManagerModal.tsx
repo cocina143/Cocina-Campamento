@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { Persona, TipoDieta } from '@/data/personas';
 import { DIETA_OPTIONS } from '@/data/personas';
+import type { SectionId } from '@/data/sections';
+import { SECTIONS } from '@/data/sections';
 import { Plus, Trash2, X, Users, AlertTriangle } from 'lucide-react';
 
 interface PeopleManagerModalProps {
@@ -17,7 +19,7 @@ export function PeopleManagerModal({ personas, onSavePersonas, onClose }: People
 
   const handleAddPersona = () => {
     if (!nombre.trim()) return;
-    const nueva: Persona = { id: Date.now().toString(), nombre: nombre.trim(), alergias: [], dieta: 'General', notas: '' };
+    const nueva: Persona = { id: Date.now().toString(), nombre: nombre.trim(), alergias: [], dieta: 'General', seccion: '', notas: '' };
     setLocalPersonas([...localPersonas, nueva]);
     setNombre('');
     setEditingId(nueva.id);
@@ -40,6 +42,10 @@ export function PeopleManagerModal({ personas, onSavePersonas, onClose }: People
 
   const handleUpdateDieta = (personaId: string, dieta: TipoDieta) => {
     setLocalPersonas((prev) => prev.map((p) => p.id === personaId ? { ...p, dieta } : p));
+  };
+
+  const handleUpdateSeccion = (personaId: string, seccion: SectionId | '') => {
+    setLocalPersonas((prev) => prev.map((p) => p.id === personaId ? { ...p, seccion } : p));
   };
 
   const handleUpdateNotas = (personaId: string, notas: string) => {
@@ -70,7 +76,10 @@ export function PeopleManagerModal({ personas, onSavePersonas, onClose }: People
 
         <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2 text-xs text-amber-800">
           <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-          <span>Añade las alergias y el tipo de dieta de cada persona. La app te alertará si un plato no es compatible.</span>
+          <div>
+            <p className="font-bold mb-1">Asigna cada persona a su sección y dieta:</p>
+            <p>Las cantidades de los platos se calcularán automáticamente según la dieta de cada persona.</p>
+          </div>
         </div>
 
         <div className="mt-4 flex gap-2">
@@ -86,10 +95,15 @@ export function PeopleManagerModal({ personas, onSavePersonas, onClose }: People
           ) : (
             localPersonas.map((persona) => (
               <div key={persona.id} className="bg-stone-50 rounded-2xl p-4 border border-stone-200">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-bold text-stone-900">{persona.nombre}</p>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${dietaColor(persona.dieta)}`}>{persona.dieta}</span>
+                    {persona.seccion && (
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-stone-200 text-stone-700 border border-stone-300">
+                        {SECTIONS.find(s => s.id === persona.seccion)?.shortName || persona.seccion}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={() => setEditingId(editingId === persona.id ? null : persona.id)} className="text-xs bg-stone-200 px-3 py-1 rounded-lg font-semibold hover:bg-stone-300">
@@ -115,6 +129,21 @@ export function PeopleManagerModal({ personas, onSavePersonas, onClose }: People
                 {editingId === persona.id && (
                   <div className="mt-3 pt-3 border-t border-stone-200 space-y-3">
                     <div>
+                      <label className="text-xs font-bold text-stone-600 block mb-1">Sección a la que pertenece</label>
+                      <select
+                        value={persona.seccion}
+                        onChange={(e) => handleUpdateSeccion(persona.id, e.target.value as SectionId | '')}
+                        className="w-full border border-stone-300 rounded-lg p-2 text-sm bg-white"
+                      >
+                        <option value="">-- Sin asignar --</option>
+                        {SECTIONS.map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-stone-500 mt-1">Las cantidades de los platos se calcularán según esta sección.</p>
+                    </div>
+
+                    <div>
                       <label className="text-xs font-bold text-stone-600 block mb-1">Tipo de dieta</label>
                       <div className="flex flex-wrap gap-2">
                         {DIETA_OPTIONS.map((opt) => (
@@ -124,10 +153,12 @@ export function PeopleManagerModal({ personas, onSavePersonas, onClose }: People
                         ))}
                       </div>
                     </div>
+
                     <div className="flex gap-2">
                       <input type="text" value={nuevaAlergia} onChange={(e) => setNuevaAlergia(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddAlergia(persona.id)} placeholder="Nueva alergia (ej: melón)" className="flex-1 border border-stone-300 rounded-lg p-2 text-xs" />
                       <button onClick={() => handleAddAlergia(persona.id)} className="bg-orange-100 text-orange-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-orange-200">+ Alergia</button>
                     </div>
+
                     <textarea value={persona.notas} onChange={(e) => handleUpdateNotas(persona.id, e.target.value)} placeholder="Notas adicionales..." className="w-full border border-stone-300 rounded-lg p-2 text-xs resize-none" rows={2} />
                   </div>
                 )}
