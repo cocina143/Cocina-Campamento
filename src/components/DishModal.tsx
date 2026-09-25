@@ -3,7 +3,7 @@ import type { Dish } from '@/data/dishes';
 import type { SectionCounts } from '@/data/sections';
 import { SECTIONS, effectiveMultiplier } from '@/data/sections';
 import type { Persona, TipoDieta } from '@/data/personas';
-import { getDesglosePorSeccionParaDieta, getTotalPersonasConDieta } from '@/data/personas';
+import { getDesglosePorSeccionParaDieta, getTotalPersonasConDieta, esIncompatibleConDieta } from '@/data/personas';
 
 interface DishModalProps {
   dish: Dish;
@@ -67,17 +67,27 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
     desglose = getDesglosePorSeccionParaDieta(counts, personas, dietaDelPlato);
     totalEfectivo = getTotalPersonasConDieta(counts, personas, dietaDelPlato);
     tituloDieta = `${dietaDelPlato.toUpperCase()} (${totalEfectivo.toFixed(1)} raciones)`;
-  } else {
-    // Plato General: calcular para TODAS las personas (no restar nadie)
+    } else {
+    // Plato General: calcular para todos MENOS los que no pueden comerlo
     desglose = SECTIONS.map((s) => {
       const totalSeccion = counts[s.id] || 0;
+      const personasDeSeccion = personas.filter((p) => p.seccion === s.id);
+      let personasQuePueden = totalSeccion;
+      
+      // Restar personas cuya dieta sea incompatible con este plato
+      personasDeSeccion.forEach((p) => {
+        if (p.dieta !== 'General' && esIncompatibleConDieta(dish, p.dieta)) {
+          personasQuePueden--;
+        }
+      });
+      
       const multiplier = effectiveMultiplier(s);
       return {
         sectionId: s.id,
         sectionName: s.shortName,
-        count: totalSeccion,
+        count: personasQuePueden,
         multiplier,
-        effectiveCount: totalSeccion * multiplier,
+        effectiveCount: personasQuePueden * multiplier,
       };
     }).filter((item) => item.count > 0);
     totalEfectivo = desglose.reduce((acc, item) => acc + item.effectiveCount, 0);
