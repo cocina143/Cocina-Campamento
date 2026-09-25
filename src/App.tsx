@@ -395,7 +395,7 @@ export default function App() {
   const dishConflicts = useMemo(() => {
     const conflictMap = new Map<string, { persona: Persona; alergiasCoincidentes: string[] }[]>();
     allVisibleDishes.forEach((dish) => {
-      const conflicts = detectAllergenConflicts(dish.ingredients || [], personasList);
+            const conflicts = detectAllergenConflicts(dish, personasList);
       if (conflicts.length > 0) {
         conflictMap.set(dish.id, conflicts);
       }
@@ -410,7 +410,7 @@ export default function App() {
     const detalles: { persona: string; alergias: string[]; platos: string[] }[] = [];
 
     allVisibleDishes.forEach((dish) => {
-      const conflicts = detectAllergenConflicts(dish.ingredients || [], personasList);
+            const conflicts = detectAllergenConflicts(dish, personasList);
       if (conflicts.length > 0) {
         platosAfectados.add(dish.name);
         conflicts.forEach((c) => {
