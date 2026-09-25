@@ -1,5 +1,25 @@
 import { supabase } from '@/lib/supabase';
 
+// ─── Alérgenos y etiquetas dietéticas disponibles ─────────────
+export const ALLERGEN_OPTIONS = [
+  { id: 'gluten', label: 'Gluten', icon: '🌾' },
+  { id: 'lactosa', label: 'Lactosa', icon: '🥛' },
+  { id: 'huevo', label: 'Huevo', icon: '🥚' },
+  { id: 'pescado', label: 'Pescado', icon: '🐟' },
+  { id: 'marisco', label: 'Marisco', icon: '🦐' },
+  { id: 'frutos_secos', label: 'Frutos secos', icon: '🥜' },
+  { id: 'soja', label: 'Soja', icon: '🫘' },
+] as const;
+
+export const DIET_OPTIONS = [
+  { id: 'vegetariano', label: 'Vegetariano', icon: '🥬' },
+  { id: 'vegano', label: 'Vegano', icon: '🌱' },
+] as const;
+
+export type AllergenId = typeof ALLERGEN_OPTIONS[number]['id'];
+export type DietId = typeof DIET_OPTIONS[number]['id'];
+
+// ─── Interfaces ────────────────────────────────────────────────
 export interface Ingredient {
   name: string;
   amount: number;
@@ -12,6 +32,8 @@ export interface Dish {
   category: 'Plato principal' | 'Especial';
   image: string;
   ingredients: Ingredient[];
+  allergens?: AllergenId[];
+  diets?: DietId[];
 }
 
 export const INITIAL_DISHES: Dish[] = [
@@ -28,6 +50,8 @@ export const INITIAL_DISHES: Dish[] = [
       { name: 'Queso rallado', amount: 15, unit: 'g' },
       { name: 'Aceite de oliva', amount: 10, unit: 'ml' },
     ],
+    allergens: ['gluten', 'lactosa'],
+    diets: [],
   },
   {
     id: 'lentejas-verduras',
@@ -42,6 +66,8 @@ export const INITIAL_DISHES: Dish[] = [
       { name: 'Pimiento verde', amount: 15, unit: 'g' },
       { name: 'Chorizo', amount: 25, unit: 'g' },
     ],
+    allergens: [],
+    diets: [],
   },
   {
     id: 'pollo-empanado',
@@ -55,6 +81,8 @@ export const INITIAL_DISHES: Dish[] = [
       { name: 'Patatas', amount: 150, unit: 'g' },
       { name: 'Aceite para freír', amount: 30, unit: 'ml' },
     ],
+    allergens: ['gluten', 'huevo'],
+    diets: [],
   },
 ];
 
@@ -62,12 +90,12 @@ export const INITIAL_DISHES: Dish[] = [
 export async function getDishesFromSupabase(): Promise<Dish[]> {
   const { data, error } = await supabase
     .from('dishes')
-    .select('id, name, category, image, ingredients')
+    .select('id, name, category, image, ingredients, allergens, diets')
     .order('name');
 
   if (error || !data) {
     console.error('❌ Error obteniendo platos de Supabase:', error);
-    return INITIAL_DISHES; // Fallback para que la app nunca se rompa
+    return INITIAL_DISHES; // Fallback seguro
   }
 
   return data.map((d: any) => ({
@@ -82,6 +110,8 @@ export async function getDishesFromSupabase(): Promise<Dish[]> {
           unit: String(ing.unit || 'g'),
         }))
       : [],
+    allergens: Array.isArray(d.allergens) ? d.allergens : [],
+    diets: Array.isArray(d.diets) ? d.diets : [],
   }));
 }
 
@@ -103,6 +133,8 @@ export async function saveDishToSupabase(dish: Dish): Promise<void> {
       category: dish.category,
       image: dish.image,
       ingredients: formattedIngredients,
+      allergens: dish.allergens || [],
+      diets: dish.diets || [],
       updated_at: new Date().toISOString(),
     });
 
