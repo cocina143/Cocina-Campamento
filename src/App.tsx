@@ -83,7 +83,7 @@ export default function App() {
   const [menuList, setMenuList] = useState<DayMenu[]>(loadMenu);
   const [selectedCampDay, setSelectedCampDay] = useState<number>(1);
   const [selectedDish, setSelectedDish] = useState<Dish | null>(null);
-  const [filter, setFilter] = useState<FilterCategory>('Todos');
+  const [filter, setFilter] = useState<FilterCategory>('General');
   const [showSectionPanel, setShowSectionPanel] = useState(false);
   const [showDishManager, setShowDishManager] = useState(false);
   const [showMenuPlanner, setShowMenuPlanner] = useState(false);
