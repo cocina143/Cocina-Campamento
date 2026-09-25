@@ -369,7 +369,7 @@ export default function App() {
       const dishIds = currentDayMenu[key] || [];
       const dishes = dishesList.filter((dish) => {
         const isPlanned = dishIds.includes(dish.id) || dishIds.includes(dish.name);
-        const matchesCategory = filter === 'Todos' || dish.category === filter;
+        const matchesCategory = filter === 'General' || (filter === 'Vegetariano' && (dish.diets?.includes('vegetariano') || dish.diets?.includes('vegano'))) || (filter === 'Halal' && !dish.ingredients?.some((ing) => /cerdo|jamón|jamon|bacon|alcohol|vino|cerveza/i.test(ing.name)));            
         return isPlanned && matchesCategory;
       });
       return { key, label, icon, dishes };
@@ -548,7 +548,7 @@ export default function App() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {(['Todos', 'Plato principal', 'Especial'] as FilterCategory[]).map((cat) => (
+                            {(['General', 'Halal', 'Vegetariano'] as FilterCategory[]).map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setFilter(cat)}
