@@ -11,6 +11,19 @@ interface DishModalProps {
   onClose: () => void;
 }
 
+function formatAmount(amount: number, unit: string): { value: string; unit: string } {
+  if (unit === 'g' && amount >= 1000) {
+    const kg = amount / 1000;
+    return { value: kg % 1 === 0 ? String(kg) : kg.toFixed(2), unit: 'kg' };
+  }
+  if (unit === 'ml' && amount >= 1000) {
+    const l = amount / 1000;
+    return { value: l % 1 === 0 ? String(l) : l.toFixed(2), unit: 'L' };
+  }
+  const rounded = amount % 1 === 0 ? String(amount) : amount.toFixed(1);
+  return { value: rounded, unit };
+}
+
 export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient, onClose }: DishModalProps) {
   const total = totalPeople(counts);
 
@@ -40,6 +53,7 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
                 const isChecked = checkedIngredients.has(`${dish.id}-${ing.name}`);
                 const amountPerPerson = Number(ing.amount) || 0;
                 const totalAmount = amountPerPerson * total;
+                const formattedTotal = formatAmount(totalAmount, ing.unit);
 
                 return (
                   <div key={idx} className="bg-stone-50 rounded-xl p-3 border border-stone-100">
@@ -54,20 +68,21 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
                         <span className={`font-semibold text-stone-900 ${isChecked ? 'line-through text-stone-400' : ''}`}>{ing.name}</span>
                       </div>
                       <span className="text-sm font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-lg whitespace-nowrap">
-                        {totalAmount % 1 === 0 ? totalAmount : totalAmount.toFixed(1)} {ing.unit}
+                        {formattedTotal.value} {formattedTotal.unit}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 pl-8">
+                    <div className="flex flex-col gap-1.5 mt-2 pl-8">
                       {SECTIONS.filter(s => counts[s.id] > 0).map((section) => {
                         const sectionCount = counts[section.id];
                         const multiplier = effectiveMultiplier(section);
                         const sectionTotal = amountPerPerson * sectionCount * multiplier;
                         if (sectionTotal === 0) return null;
+                        const formattedSection = formatAmount(sectionTotal, ing.unit);
                         return (
-                          <div key={section.id} className="flex justify-between text-xs text-stone-600 bg-white p-1.5 rounded border border-stone-100">
-                            <span className="font-medium">{section.shortName}</span>
-                            <span className="font-bold text-stone-800">{sectionTotal % 1 === 0 ? sectionTotal : sectionTotal.toFixed(1)} {ing.unit}</span>
+                          <div key={section.id} className="flex justify-between items-center text-sm bg-white p-2 rounded-lg border border-stone-100">
+                            <span className={`font-semibold ${section.textColor}`}>{section.shortName}</span>
+                            <span className="font-bold text-stone-800">{formattedSection.value} {formattedSection.unit}</span>
                           </div>
                         );
                       })}
