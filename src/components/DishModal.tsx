@@ -62,26 +62,22 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
   let totalEfectivo: number;
   let tituloDieta: string;
 
-  if (dietaDelPlato) {
+    if (dietaDelPlato) {
     // Plato con dieta específica: calcular solo para personas con esa dieta
     desglose = getDesglosePorSeccionParaDieta(counts, personas, dietaDelPlato);
     totalEfectivo = getTotalPersonasConDieta(counts, personas, dietaDelPlato);
     tituloDieta = `${dietaDelPlato.toUpperCase()} (${totalEfectivo.toFixed(1)} raciones)`;
   } else {
-    // Plato General: calcular para todos MENOS los que tienen dieta especial
+    // Plato General: calcular para TODAS las personas (no restar nadie)
     desglose = SECTIONS.map((s) => {
       const totalSeccion = counts[s.id] || 0;
-      const personasConDietaEspecial = personas.filter(
-        (p) => p.seccion === s.id && p.dieta !== 'General'
-      ).length;
-      const personasGeneral = Math.max(0, totalSeccion - personasConDietaEspecial);
       const multiplier = effectiveMultiplier(s);
       return {
         sectionId: s.id,
         sectionName: s.shortName,
-        count: personasGeneral,
+        count: totalSeccion,
         multiplier,
-        effectiveCount: personasGeneral * multiplier,
+        effectiveCount: totalSeccion * multiplier,
       };
     }).filter((item) => item.count > 0);
     totalEfectivo = desglose.reduce((acc, item) => acc + item.effectiveCount, 0);
