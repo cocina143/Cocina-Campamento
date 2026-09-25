@@ -2,7 +2,7 @@ import type { Dish } from '@/data/dishes';
 import type { SectionCounts } from '@/data/sections';
 import { SECTIONS, effectiveMultiplier } from '@/data/sections';
 import type { Persona, TipoDieta } from '@/data/personas';
-import { getTotalPersonasConDieta } from '@/data/personas';
+import { getTotalPersonasConDieta, getPersonasQueNoPuedenComer } from '@/data/personas';
 import { getFallbackImage } from '@/services/imageService';
 
 interface DishCardProps {
@@ -59,13 +59,16 @@ function getPersonasEfectivas(dish: Dish, counts: SectionCounts, personas: Perso
     return getTotalPersonasConDieta(counts, personas, dietaDelPlato);
   }
   
-  // Plato General: calcular para TODAS las personas (no restar nadie)
+  // Plato General: calcular para todos MENOS los que no pueden comerlo por su dieta
   let total = 0;
   SECTIONS.forEach((s) => {
     const totalSeccion = counts[s.id] || 0;
     total += totalSeccion * effectiveMultiplier(s);
   });
-  return total;
+  
+  // Restar personas que no pueden comer este plato (ej: vegetarianos en plato con carne)
+  const personasQueNoPueden = getPersonasQueNoPuedenComer(dish, counts, personas);
+  return Math.max(0, total - personasQueNoPueden);
 }
 
 export function DishCard({ dish, counts, checkedCount, onClick, personas = [] }: DishCardProps) {
