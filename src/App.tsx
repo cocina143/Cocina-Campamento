@@ -760,13 +760,14 @@ export default function App() {
         />
       )}
 
-      {selectedDish && (
+            {selectedDish && (
         <DishModal
           dish={selectedDish}
           counts={counts}
           checkedIngredients={checkedIngredients}
           onToggleIngredient={toggleIngredient}
           onClose={() => setSelectedDish(null)}
+          personas={personasList}
         />
       )}
     </div>
