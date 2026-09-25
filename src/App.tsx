@@ -522,11 +522,11 @@ export default function App() {
               </button>
 
               {/* Botón PDF del Día */}
-              <button
+                            <button
                 onClick={() => {
                   const currentDayMenu = menuList.find((m) => m.day === selectedCampDay);
                   if (currentDayMenu) {
-                    generateDailyShoppingPDF(currentDayMenu, dishesList, counts);
+                    generateDailyShoppingPDF(currentDayMenu, dishesList, counts, personasList);
                   }
                 }}
                 className="flex items-center justify-center gap-2 bg-emerald-600 text-white rounded-2xl px-4 py-3 sm:py-2.5 text-sm font-bold hover:bg-emerald-700 transition-all shadow-sm flex-1 sm:flex-initial"
@@ -536,9 +536,9 @@ export default function App() {
               </button>
 
               {/* Botón PDF Global 15 días */}
-              <button
+                            <button
                 onClick={() => {
-                  generateGlobalShoppingPDF(menuList, dishesList, counts);
+                  generateGlobalShoppingPDF(menuList, dishesList, counts, personasList);
                 }}
                 className="flex items-center justify-center gap-2 bg-teal-700 text-white rounded-2xl px-4 py-3 sm:py-2.5 text-sm font-bold hover:bg-teal-800 transition-all shadow-sm flex-1 sm:flex-initial"
               >
