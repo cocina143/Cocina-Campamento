@@ -75,7 +75,43 @@ const SINONIMOS: Record<string, string[]> = {
 function normalizar(texto: string): string {
   return texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 }
+// Detecta si un plato es incompatible con una dieta específica
+export function esIncompatibleConDieta(dish: Dish, dieta: TipoDieta): boolean {
+  const ingredientes = (dish.ingredients || []).map((ing) => ing.name.toLowerCase());
+  const nombrePlato = dish.name.toLowerCase();
+  const textoCompleto = [...ingredientes, nombrePlato].join(' ');
 
+  if (dieta === 'Vegetariano') {
+    const noVegetariano = ['cerdo', 'pollo', 'carne', 'vacuno', 'ternera', 'cordero', 'pescado', 'marisco', 'gamba', 'atun', 'salmon', 'bacalao', 'merluza', 'jamon', 'bacon', 'chorizo', 'salchicha'];
+    return noVegetariano.some((ing) => textoCompleto.includes(ing));
+  }
+
+  if (dieta === 'Vegano') {
+    const noVegano = ['cerdo', 'pollo', 'carne', 'vacuno', 'pescado', 'marisco', 'huevo', 'leche', 'queso', 'yogur', 'nata', 'mantequilla', 'miel', 'jamon', 'bacon'];
+    return noVegano.some((ing) => textoCompleto.includes(ing));
+  }
+
+  if (dieta === 'Halal') {
+    const noHalal = ['cerdo', 'jamon', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
+    return noHalal.some((ing) => textoCompleto.includes(ing));
+  }
+
+  return false;
+}
+
+// Calcula cuántas personas NO pueden comer un plato (por su dieta)
+export function getPersonasQueNoPuedenComer(dish: Dish, counts: SectionCounts, personas: Persona[]): number {
+  let total = 0;
+  SECTIONS.forEach((s) => {
+    const personasDeSeccion = personas.filter((p) => p.seccion === s.id);
+    personasDeSeccion.forEach((p) => {
+      if (p.dieta !== 'General' && esIncompatibleConDieta(dish, p.dieta)) {
+        total += effectiveMultiplier(s);
+      }
+    });
+  });
+  return total;
+}
 export function detectAllergenConflicts(dish: Dish, personas: Persona[]) {
   const conflicts: { persona: Persona; alergiasCoincidentes: string[] }[] = [];
   const ingredientesNormalizados = (dish.ingredients || []).map((ing) => normalizar(ing.name));
