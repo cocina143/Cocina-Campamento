@@ -662,12 +662,14 @@ export default function App() {
                     const conflicts = dishConflicts.get(dish.id);
                     return (
                       <div key={dish.id} className="flex flex-col gap-2">
-                        <DishCard
-                          dish={dish}
-                          counts={counts}
-                          checkedCount={dishChecked}
-                          onClick={() => setSelectedDish(dish)}
-                        />
+                     <DishCard
+                        key={dish.id}
+                        dish={dish}
+                        counts={counts}
+                        checkedCount={dishChecked}
+                        onClick={() => setSelectedDish(dish)}
+                        personas={personasList}
+                      />
                         {/* Alerta de alergias si hay conflictos */}
                         {conflicts && conflicts.length > 0 && (
                           <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
