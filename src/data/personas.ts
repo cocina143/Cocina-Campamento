@@ -1,88 +1,74 @@
 import { supabase } from '@/lib/supabase';
 import type { Dish } from '@/data/dishes';
 
+export type TipoDieta = 'General' | 'Halal' | 'Vegetariano' | 'Vegano';
+
+export const DIETA_OPTIONS: TipoDieta[] = ['General', 'Halal', 'Vegetariano', 'Vegano'];
+
 export interface Persona {
   id: string;
   nombre: string;
   alergias: string[];
+  dieta: TipoDieta;
   notas: string;
 }
 
 export async function getPersonasFromSupabase(): Promise<Persona[]> {
-  const { data, error } = await supabase
-    .from('personas')
-    .select('*')
-    .order('nombre');
-
+  const { data, error } = await supabase.from('personas').select('*').order('nombre');
   if (error) {
-    console.error('❌ Error obteniendo personas de Supabase:', error);
+    console.error('Error obteniendo personas:', error);
     return [];
   }
-
   return (data || []).map((p: any) => ({
     id: p.id,
     nombre: p.nombre,
     alergias: Array.isArray(p.alergias) ? p.alergias : [],
+    dieta: (['General', 'Halal', 'Vegetariano', 'Vegano'].includes(p.dieta) ? p.dieta : 'General') as TipoDieta,
     notas: p.notas || '',
   }));
 }
 
 export async function savePersonaToSupabase(persona: Persona): Promise<void> {
-  const { error } = await supabase
-    .from('personas')
-    .upsert({
-      id: persona.id,
-      nombre: persona.nombre,
-      alergias: persona.alergias,
-      notas: persona.notas,
-      updated_at: new Date().toISOString(),
-    });
-
+  const { error } = await supabase.from('personas').upsert({
+    id: persona.id,
+    nombre: persona.nombre,
+    alergias: persona.alergias,
+    dieta: persona.dieta,
+    notas: persona.notas,
+    updated_at: new Date().toISOString(),
+  });
   if (error) {
-    console.error(`❌ Error guardando persona "${persona.nombre}":`, error);
+    console.error(`Error guardando persona "${persona.nombre}":`, error);
     throw error;
   }
 }
 
-// ─── SINÓNIMOS: relaciona alergias comunes con alérgenos estándar ───
 const SINONIMOS: Record<string, string[]> = {
-  gluten: ['gluten', 'trigo', 'harina', 'pan', 'pasta', 'macarrones', 'espaguetis', 'cuscús', 'centeno', 'cebada', 'avena'],
-  lactosa: ['lactosa', 'leche', 'queso', 'yogur', 'nata', 'mantequilla', 'crema', 'lácteo', 'lacteos'],
+  gluten: ['gluten', 'trigo', 'harina', 'pan', 'pasta', 'macarrones', 'espaguetis', 'cuscus'],
+  lactosa: ['lactosa', 'leche', 'queso', 'yogur', 'nata', 'mantequilla', 'crema'],
   huevo: ['huevo', 'huevos', 'mayonesa', 'merengue'],
-  pescado: ['pescado', 'pescados', 'bacalao', 'merluza', 'atún', 'salmón', 'sardina'],
-  marisco: ['marisco', 'mariscos', 'gambas', 'langostinos', 'mejillones', 'almejas', 'pulpo', 'calamar'],
-  frutos_secos: ['frutos secos', 'frutossecos', 'nueces', 'almendras', 'cacahuetes', 'avellanas', 'piñones', 'anacardos'],
-  soja: ['soja', 'soya', 'tofu', 'soja texturizada'],
+  pescado: ['pescado', 'bacalao', 'merluza', 'atun', 'salmon', 'sardina'],
+  marisco: ['marisco', 'gambas', 'langostinos', 'mejillones', 'almejas', 'pulpo', 'calamar'],
+  frutos_secos: ['frutos secos', 'nueces', 'almendras', 'cacahuetes', 'avellanas', 'pinones'],
+  soja: ['soja', 'tofu'],
 };
 
-// Función para normalizar texto (quitar acentos, minúsculas, artículos)
 function normalizar(texto: string): string {
-  return texto
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Quitar acentos
-    .replace(/\b(el|la|los|las|un|una|de|del|con|sin|y|o)\b/g, '') // Quitar artículos
-    .trim();
+  return texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 }
 
-// Detecta conflictos entre un plato y las personas con alergias
 export function detectAllergenConflicts(
   dish: Dish,
   personas: Persona[]
 ): { persona: Persona; alergiasCoincidentes: string[] }[] {
   const conflicts: { persona: Persona; alergiasCoincidentes: string[] }[] = [];
-
-  // Preparar los ingredientes del plato normalizados
   const ingredientesNormalizados = (dish.ingredients || []).map((ing) => normalizar(ing.name));
 
   personas.forEach((persona) => {
     const coincidencias: string[] = [];
-
     persona.alergias.forEach((alergia) => {
       const alergiaNorm = normalizar(alergia);
       let detectada = false;
-
-      // 1. Buscar coincidencia directa en los ingredientes del plato
       for (const ingNorm of ingredientesNormalizados) {
         if (ingNorm.includes(alergiaNorm) || alergiaNorm.includes(ingNorm)) {
           coincidencias.push(alergia);
@@ -90,24 +76,14 @@ export function detectAllergenConflicts(
           break;
         }
       }
-
-      // 2. Si no se detectó, buscar en los alérgenos marcados del plato
       if (!detectada && dish.allergens && dish.allergens.length > 0) {
-        // Buscar si la alergia de la persona coincide con algún alérgeno del plato
         for (const alergenoPlato of dish.allergens) {
-          // Comprobar sinónimos
-          const sinonimosAlergeno = SINONIMOS[alergenoPlato] || [];
-          const coincide = sinonimosAlergeno.some((sin) => 
-            normalizar(sin).includes(alergiaNorm) || alergiaNorm.includes(normalizar(sin))
-          );
-          
-          if (coincide) {
+          const sinonimos = SINONIMOS[alergenoPlato] || [];
+          if (sinonimos.some((s) => normalizar(s).includes(alergiaNorm) || alergiaNorm.includes(normalizar(s)))) {
             coincidencias.push(`${alergia} (por ${alergenoPlato})`);
             detectada = true;
             break;
           }
-          
-          // También comprobar si la alergia es exactamente el alergeno
           if (normalizar(alergenoPlato) === alergiaNorm) {
             coincidencias.push(alergia);
             detectada = true;
@@ -116,11 +92,9 @@ export function detectAllergenConflicts(
         }
       }
     });
-
     if (coincidencias.length > 0) {
       conflicts.push({ persona, alergiasCoincidentes: coincidencias });
     }
   });
-
   return conflicts;
 }
