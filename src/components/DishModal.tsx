@@ -1,7 +1,7 @@
 import { X, CheckCircle2 } from 'lucide-react';
 import type { Dish } from '@/data/dishes';
 import type { SectionCounts } from '@/data/sections';
-import { SECTIONS, effectiveMultiplier, totalPeople } from '@/data/sections';
+import { SECTIONS, effectiveMultiplier } from '@/data/sections';
 
 interface DishModalProps {
   dish: Dish;
@@ -12,12 +12,10 @@ interface DishModalProps {
 }
 
 function formatAmount(amount: number, unit: string): { value: string; unit: string } {
-  // Para unidades (ud, huevos, etc.): redondear a 1 decimal máximo
   if (unit === 'ud') {
     const rounded = amount % 1 === 0 ? String(amount) : amount.toFixed(1);
     return { value: rounded, unit: 'ud' };
   }
-  // Para gramos: convertir a kg con 1 decimal si >= 1000
   if (unit === 'g') {
     if (amount >= 1000) {
       const kg = amount / 1000;
@@ -26,7 +24,6 @@ function formatAmount(amount: number, unit: string): { value: string; unit: stri
     const rounded = amount % 1 === 0 ? String(amount) : amount.toFixed(1);
     return { value: rounded, unit: 'g' };
   }
-  // Para ml: convertir a L con 1 decimal si >= 1000
   if (unit === 'ml') {
     if (amount >= 1000) {
       const l = amount / 1000;
@@ -35,13 +32,22 @@ function formatAmount(amount: number, unit: string): { value: string; unit: stri
     const rounded = amount % 1 === 0 ? String(amount) : amount.toFixed(1);
     return { value: rounded, unit: 'ml' };
   }
-  // Para kg o L ya definidos: mostrar tal cual con 1 decimal si hace falta
   const rounded = amount % 1 === 0 ? String(amount) : amount.toFixed(1);
   return { value: rounded, unit };
 }
 
+// Calcula el "total real" aplicando los multiplicadores de cada sección
+function getRealTotal(counts: SectionCounts): number {
+  return SECTIONS.reduce((acc, s) => {
+    const count = counts[s.id] || 0;
+    const multiplier = effectiveMultiplier(s);
+    return acc + count * multiplier;
+  }, 0);
+}
+
 export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient, onClose }: DishModalProps) {
-  const total = totalPeople(counts);
+  const realTotal = getRealTotal(counts);
+  const totalPersonas = SECTIONS.reduce((acc, s) => acc + (counts[s.id] || 0), 0);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -59,16 +65,18 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
 
         <div className="p-4 sm:p-6 space-y-6">
           <div>
-            <h3 className="text-sm font-bold text-stone-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <h3 className="text-sm font-bold text-stone-500 uppercase tracking-wider mb-3 flex items-center gap-2 flex-wrap">
               Ingredientes y Cantidades
-              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full normal-case">Total: {total} comensales</span>
+              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full normal-case">
+                {totalPersonas} comensales ({realTotal.toFixed(1)} raciones efectivas)
+              </span>
             </h3>
 
             <div className="space-y-4">
               {(dish.ingredients || []).map((ing, idx) => {
                 const isChecked = checkedIngredients.has(`${dish.id}-${ing.name}`);
                 const amountPerPerson = Number(ing.amount) || 0;
-                const totalAmount = amountPerPerson * total;
+                const totalAmount = amountPerPerson * realTotal;
                 const formattedTotal = formatAmount(totalAmount, ing.unit);
 
                 return (
