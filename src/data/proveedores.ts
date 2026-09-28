@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
+// ─── Tipos ─────────────────────────────────────────────────────
 export type EspecialidadProveedor = 
   | 'carnes' | 'pescados' | 'verduras' | 'lacteos' | 'panaderia' 
   | 'seco' | 'congelados' | 'bebidas' | 'limpieza' | 'otros';
@@ -28,10 +29,12 @@ export interface Proveedor {
   campamentos: string[];
 }
 
+// ─── Helpers ───────────────────────────────────────────────────
 function isValidUUID(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 }
 
+// ─── Funciones CRUD ────────────────────────────────────────────
 export async function getProveedoresFromSupabase(): Promise<Proveedor[]> {
   const { data, error } = await supabase.from('proveedores').select('*').order('nombre');
   if (error) { console.error('❌ Error obteniendo proveedores:', error); return []; }
@@ -41,7 +44,7 @@ export async function getProveedoresFromSupabase(): Promise<Proveedor[]> {
     nombre: p.nombre || '',
     telefono: p.telefono || '',
     email: p.email || '',
-        especialidades: Array.isArray(p.especialidades) 
+    especialidades: Array.isArray(p.especialidades) 
       ? p.especialidades.filter((e: string) => ESPECIALIDADES.some(esp => esp.id === e))
       : [],
     direccion: p.direccion || '',
@@ -56,7 +59,7 @@ export async function saveProveedorToSupabase(proveedor: Proveedor): Promise<voi
     nombre: proveedor.nombre,
     telefono: proveedor.telefono,
     email: proveedor.email,
-        especialidades: proveedor.especialidades || [],
+    especialidades: proveedor.especialidades || [],
     direccion: proveedor.direccion,
     notas: proveedor.notas,
     campamentos: proveedor.campamentos || [],
@@ -66,11 +69,9 @@ export async function saveProveedorToSupabase(proveedor: Proveedor): Promise<voi
   let error;
   if (isValidUUID(proveedor.id)) {
     datos.id = proveedor.id;
-    console.log('📝 Actualizando proveedor existente, ID:', proveedor.id);
     const res = await supabase.from('proveedores').upsert(datos, { onConflict: 'id' });
     error = res.error;
   } else {
-    console.log('✨ Insertando nuevo proveedor (Supabase generará el ID)');
     const res = await supabase.from('proveedores').insert(datos);
     error = res.error;
   }
@@ -98,17 +99,19 @@ export function getProveedoresPorCampamento(proveedores: Proveedor[], campamento
 export function getEspecialidadLabel(especialidad: EspecialidadProveedor): string {
   const esp = ESPECIALIDADES.find((e) => e.id === especialidad);
   return esp ? `${esp.icon} ${esp.label}` : especialidad;
-  // ─── Clasificación de ingredientes por categoría ───────────
+}
+
+// ─── Clasificación de ingredientes por categoría ───────────────
 const CLASIFICACION_INGREDIENTES: Record<EspecialidadProveedor, string[]> = {
-  carnes: ['pollo', 'cerdo', 'vacuno', 'ternera', 'cordero', 'carne', 'picada', 'chopped', 'jamón', 'jamon', 'chorizo', 'salchicha', 'bacon', 'pavo'],
-  pescados: ['pescado', 'bacalao', 'merluza', 'atún', 'atun', 'salmón', 'salmon', 'sardina', 'gamba', 'langostino', 'mejillón', 'mejillon', 'calamar', 'pulpo', 'marisco'],
-  verduras: ['cebolla', 'tomate', 'patata', 'pimiento', 'zanahoria', 'lechuga', 'pepino', 'calabacín', 'calabacin', 'berenjena', 'ajo', 'perejil', 'espinaca', 'acelga', 'brócoli', 'brocoli', 'coliflor', 'judía', 'judia', 'guisante', 'verdura', 'ensalada'],
-  lacteos: ['leche', 'queso', 'yogur', 'nata', 'mantequilla', 'crema', 'requesón', 'requeson', 'mozzarella', 'parmesano', 'manchego'],
-  panaderia: ['pan', 'baguette', 'boll', 'croissant', 'bollería', 'bolleria', 'harina'],
-  seco: ['arroz', 'pasta', 'macarrones', 'espagueti', 'cuscús', 'cuscus', 'legumbre', 'lenteja', 'garbanzo', 'alubia', 'azúcar', 'azucar', 'sal', 'pimienta', 'aceite', 'vinagre', 'conserva', 'tomate frito', 'caldo'],
-  congelados: ['congelado', 'helado', 'patatas fritas congeladas', 'croqueta'],
-  bebidas: ['agua', 'zumo', 'refresco', 'cola', 'cerveza', 'vino', 'café', 'cafe', 'té', 'te', 'infusión', 'infusion', 'chocolate'],
-  limpieza: ['detergente', 'lejía', 'lejia', 'jabón', 'jabon', 'estropajo', 'papel', 'film', 'aluminio', 'bolsa'],
+  carnes: ['pollo', 'cerdo', 'vacuno', 'ternera', 'cordero', 'carne', 'picada', 'chopped', 'jamon', 'chorizo', 'salchicha', 'bacon', 'pavo'],
+  pescados: ['pescado', 'bacalao', 'merluza', 'atun', 'salmon', 'sardina', 'gamba', 'langostino', 'mejillon', 'calamar', 'pulpo', 'marisco'],
+  verduras: ['cebolla', 'tomate', 'patata', 'pimiento', 'zanahoria', 'lechuga', 'pepino', 'calabacin', 'berenjena', 'ajo', 'perejil', 'espinaca', 'acelga', 'brocoli', 'coliflor', 'judia', 'guisante', 'verdura', 'ensalada'],
+  lacteos: ['leche', 'queso', 'yogur', 'nata', 'mantequilla', 'crema', 'requeson', 'mozzarella', 'parmesano', 'manchego'],
+  panaderia: ['pan', 'baguette', 'bollo', 'croissant', 'bolleria', 'harina'],
+  seco: ['arroz', 'pasta', 'macarrones', 'espagueti', 'cuscus', 'legumbre', 'lenteja', 'garbanzo', 'alubia', 'azucar', 'sal', 'pimienta', 'aceite', 'vinagre', 'conserva', 'caldo'],
+  congelados: ['congelado', 'helado', 'croqueta'],
+  bebidas: ['agua', 'zumo', 'refresco', 'cola', 'cerveza', 'vino', 'cafe', 'te', 'infusion', 'chocolate'],
+  limpieza: ['detergente', 'lejia', 'jabon', 'estropajo', 'papel', 'film', 'aluminio', 'bolsa'],
   otros: [],
 };
 
@@ -124,19 +127,16 @@ export function clasificarIngrediente(nombreIngrediente: string): EspecialidadPr
   return 'otros';
 }
 
-// ─── Agrupar ingredientes del menú por proveedor ───────────
 export function agruparIngredientesPorProveedor(
   ingredientes: { nombre: string; cantidad: number; unidad: string }[],
   proveedores: Proveedor[]
 ): { proveedor: Proveedor; ingredientes: { nombre: string; cantidad: number; unidad: string }[] }[] {
-  // Agrupar ingredientes por categoría
   const porCategoria: Record<EspecialidadProveedor, { nombre: string; cantidad: number; unidad: string }[]> = {};
   
   ingredientes.forEach((ing) => {
     const categoria = clasificarIngrediente(ing.nombre);
     if (!porCategoria[categoria]) porCategoria[categoria] = [];
     
-    // Sumar si ya existe (misma nombre y unidad)
     const existente = porCategoria[categoria].find(
       (i) => i.nombre.toLowerCase() === ing.nombre.toLowerCase() && i.unidad === ing.unidad
     );
@@ -147,7 +147,6 @@ export function agruparIngredientesPorProveedor(
     }
   });
 
-  // Asignar cada categoría a los proveedores que la suministran
   const resultado: { proveedor: Proveedor; ingredientes: { nombre: string; cantidad: number; unidad: string }[] }[] = [];
   
   proveedores.forEach((prov) => {
@@ -167,7 +166,6 @@ export function agruparIngredientesPorProveedor(
     }
   });
 
-  // Ingredientes sin clasificar (categoría "otros") → agrupar en "Sin proveedor asignado"
   if (porCategoria['otros'] && porCategoria['otros'].length > 0) {
     resultado.push({
       proveedor: {
@@ -185,5 +183,4 @@ export function agruparIngredientesPorProveedor(
   }
 
   return resultado;
-}
 }
