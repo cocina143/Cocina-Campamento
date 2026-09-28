@@ -171,8 +171,24 @@ export function ProveedoresView({
         <ProveedorFormModal proveedor={editingProveedor} campamentos={campamentos || []} onSave={(p) => { onSaveProveedor(p); setShowProveedorForm(false); setEditingProveedor(null); }} onDelete={(id) => { onDeleteProveedor(id); setShowProveedorForm(false); setEditingProveedor(null); }} onClose={() => { setShowProveedorForm(false); setEditingProveedor(null); }} />
       )}
 
-      {showCampamentoForm && (
-        <CampamentoFormModal campamento={editingCampamento} onSave={(c) => { onSaveCampamento(c); setShowCampamentoForm(false); setEditingCampamento(null); }} onDelete={(id) => { onDeleteCampamento(id); setShowCampamentoForm(false); setEditingCampamento(null); }} onClose={() => { setShowCampamentoForm(false); setEditingCampamento(null); }} />
+           {showCampamentoForm && (
+        <CampamentoFormModal
+          campamento={editingCampamento}
+          onSave={(c) => {
+            if (onSaveCampamento) onSaveCampamento(c);
+            setShowCampamentoForm(false);
+            setEditingCampamento(null);
+          }}
+          onDelete={(id) => {
+            if (onDeleteCampamento) onDeleteCampamento(id);
+            setShowCampamentoForm(false);
+            setEditingCampamento(null);
+          }}
+          onClose={() => {
+            setShowCampamentoForm(false);
+            setEditingCampamento(null);
+          }}
+        />
       )}
 
       {showPinSettings && (
