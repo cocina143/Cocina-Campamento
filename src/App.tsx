@@ -186,6 +186,14 @@ export default function App() {
         console.warn('Modo Offline: sin proveedores cargados', err);
       }
     }
+        async function fetchRemoteCampamentos() {
+      try {
+        const remoteCampamentos = await getCampamentosFromSupabase();
+        setCampamentosList(remoteCampamentos);
+      } catch (err) {
+        console.warn('Modo Offline: sin campamentos cargados', err);
+      }
+    }
     async function fetchRemotePersonas() {
       try {
         const remotePersonas = await getPersonasFromSupabase();
@@ -200,6 +208,7 @@ export default function App() {
     fetchRemoteCounts();
     fetchRemotePersonas();
     fetchRemoteProveedores();
+    fetchRemoteCampamentos();
     const dishesSubscription = supabase
       .channel('public:dishes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'dishes' }, () => {
@@ -233,12 +242,19 @@ export default function App() {
         fetchRemoteProveedores();
       })
       .subscribe();
+   const campamentosSubscription = supabase
+      .channel('public:campamentos')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'campamentos' }, () => {
+        fetchRemoteCampamentos();
+      })
+      .subscribe();
     return () => {
       supabase.removeChannel(dishesSubscription);
       supabase.removeChannel(menuSubscription);
       supabase.removeChannel(countsSubscription);
       supabase.removeChannel(personasSubscription);
       supabase.removeChannel(proveedoresSubscription);
+      supabase.removeChannel(campamentosSubscription);
     };
   }, []);
 
@@ -844,9 +860,10 @@ export default function App() {
         />
       )}
       {/* Vista dedicada de Proveedores */}
-      {showProveedores && (
+           {showProveedores && (
         <ProveedoresView
           proveedores={proveedoresList}
+          campamentos={campamentosList}
           onSaveProveedor={handleSaveProveedor}
           onDeleteProveedor={handleDeleteProveedor}
           onSaveCampamento={handleSaveCampamento}
