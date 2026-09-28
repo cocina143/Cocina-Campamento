@@ -447,45 +447,42 @@ export default function App() {
     <div className="min-h-screen bg-stone-50 text-stone-900">
       <Header counts={counts} date={date} />
 
-      {/* Barra de control */}
+            {/* Barra de control */}
       <section className="sticky top-0 z-30 bg-stone-50/95 backdrop-blur-md border-b border-stone-200/60">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={() => setShowSectionPanel(true)}
-                className="flex items-center gap-3 bg-white rounded-2xl border border-stone-200 shadow-sm px-4 py-2.5 hover:border-orange-300 hover:shadow-md transition-all flex-1 sm:flex-initial"
+                className="flex items-center gap-2 bg-white rounded-xl border border-stone-200 shadow-sm px-3 py-2 hover:border-orange-300 hover:shadow-md transition-all flex-1 sm:flex-initial"
               >
-                <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-orange-600" />
+                                <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+                  <Users className="w-4 h-4 text-orange-600" />
                 </div>
                 <div className="flex-1 text-left">
-                  <p className="font-bold text-stone-900 text-sm">
-                    {total} comensales · {activeSectionCount}{' '}
-                    {activeSectionCount === 1 ? 'sección' : 'secciones'}
+                  <p className="font-bold text-stone-900 text-xs">
+                    {total} comensales
                   </p>
-                  <p className="text-stone-500 text-xs flex items-center gap-1">
-                    <Settings className="w-3 h-3" />
-                    Configurar secciones
+                  <p className="text-stone-500 text-[10px]">
+                    {activeSectionCount} {activeSectionCount === 1 ? 'sección' : 'secciones'}
                   </p>
                 </div>
               </button>
 
-              {/* Botón de Alergias */}
+                            {/* Botón de Alergias */}
               <button
                 onClick={() => setShowPeopleManager(true)}
-                className="flex items-center gap-3 bg-white rounded-2xl border border-stone-200 shadow-sm px-4 py-2.5 hover:border-red-300 hover:shadow-md transition-all flex-1 sm:flex-initial"
+                className="flex items-center gap-2 bg-white rounded-xl border border-stone-200 shadow-sm px-3 py-2 hover:border-red-300 hover:shadow-md transition-all flex-1 sm:flex-initial"
               >
-                <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4 text-red-600" />
                 </div>
                 <div className="flex-1 text-left">
-                  <p className="font-bold text-stone-900 text-sm">
-                                       {personasList.length} {personasList.length === 1 ? 'persona' : 'personas'} con Alergias/Dietas
+                  <p className="font-bold text-stone-900 text-xs">
+                    {personasList.length} {personasList.length === 1 ? 'persona' : 'personas'}
                   </p>
-                  <p className="text-stone-500 text-xs flex items-center gap-1">
-                    <Settings className="w-3 h-3" />
-                      Gestionar alergias y dietas
+                  <p className="text-stone-500 text-[10px]">
+                    Alergias/Dietas
                   </p>
                 </div>
               </button>
