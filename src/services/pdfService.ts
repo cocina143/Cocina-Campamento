@@ -337,6 +337,141 @@ export function generateGlobalShoppingPDF(
       didDrawPage: (d) => { currentY = d.cursor.y + 5; },
     });
     currentY += 5;
+    // ─── PDF de compra agrupado por proveedor ────────────────────
+import { agruparIngredientesPorProveedor, type Proveedor } from '@/data/proveedores';
+
+export function generateCompraPorProveedorPDF(
+  dayMenu: DayMenu,
+  allDishes: Dish[],
+  counts: SectionCounts,
+  personas: Persona[],
+  proveedores: Proveedor[],
+  campName: string = 'Cocina La Milagrosa 143'
+): void {
+  const doc = new jsPDF();
+  let currentY = 20;
+
+  // Recopilar todos los ingredientes del día
+  const todosIngredientes: { nombre: string; cantidad: number; unidad: string }[] = [];
+  
+  const meals: ('desayuno' | 'comida' | 'merienda' | 'cena')[] = ['desayuno', 'comida', 'merienda', 'cena'];
+  
+  meals.forEach((meal) => {
+    const dishIds = dayMenu[meal] || [];
+    const dayDishes = allDishes.filter((d) => dishIds.includes(d.id) || dishIds.includes(d.name));
+    
+    dayDishes.forEach((dish) => {
+      const dietaDelPlato = getDietaDelPlato(dish);
+      const comensales = getPersonasEfectivasParaPlato(dish, counts, personas);
+      
+      (dish.ingredients || []).forEach((ing) => {
+        const qty = (Number(ing.amount) || 0) * comensales;
+        todosIngredientes.push({
+          nombre: ing.name,
+          cantidad: qty,
+          unidad: ing.unit || 'g',
+        });
+      });
+    });
+  });
+
+  // Agrupar por proveedor
+  const porProveedor = agruparIngredientesPorProveedor(todosIngredientes, proveedores);
+
+  // Cabecera
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text(campName, 14, currentY);
+  currentY += 8;
+
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Lista de Compra por Proveedor — Día ${dayMenu.day}`, 14, currentY);
+  currentY += 6;
+
+  doc.setFontSize(10);
+  doc.setTextColor(60, 60, 60);
+  doc.text(`Generado: ${new Date().toLocaleDateString('es-ES')}`, 14, currentY);
+  currentY += 10;
+
+  if (porProveedor.length === 0) {
+    doc.setFontSize(12);
+    doc.text('No hay ingredientes para este día.', 14, currentY);
+  } else {
+    porProveedor.forEach((grupo, idx) => {
+      if (currentY > 220) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      // Cabecera del proveedor
+      doc.setFillColor(234, 88, 12);
+      doc.rect(14, currentY - 4, 182, 10, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${idx + 1}. ${grupo.proveedor.nombre}`, 17, currentY + 2);
+      currentY += 10;
+
+      // Datos de contacto
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      
+      const datosContacto: string[] = [];
+      if (grupo.proveedor.telefono) datosContacto.push(`📞 ${grupo.proveedor.telefono}`);
+      if (grupo.proveedor.email) datosContacto.push(`✉ ${grupo.proveedor.email}`);
+      if (grupo.proveedor.direccion) datosContacto.push(`📍 ${grupo.proveedor.direccion}`);
+      
+      if (datosContacto.length > 0) {
+        doc.text(datosContacto.join('   |   '), 17, currentY);
+        currentY += 5;
+      }
+
+      // Tabla de ingredientes
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Ingrediente', 'Cantidad', 'Unidad']],
+        body: grupo.ingredientes.map((ing) => [
+          ing.nombre,
+          formatQty(ing.cantidad, ing.unidad),
+          ing.unidad,
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [251, 146, 60], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+        alternateRowStyles: { fillColor: [255, 247, 237] },
+        styles: { fontSize: 9, cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 100 },
+          1: { cellWidth: 45, halign: 'right' },
+          2: { cellWidth: 30, halign: 'center' },
+        },
+        didDrawPage: (d) => { currentY = d.cursor.y + 5; },
+      });
+
+      // Total de productos
+      currentY += 2;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Total: ${grupo.ingredientes.length} productos`, 17, currentY);
+      currentY += 8;
+    });
+  }
+
+  // Pie de página
+  const pageCount = (doc as any).lastAutoTable?.pageCount || 1;
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`${campName} — ${new Date().toLocaleDateString('es-ES')}`, 14, doc.internal.pageSize.height - 10);
+    doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
+  }
+
+  doc.save(`Compra_Proveedores_Dia_${dayMenu.day}.pdf`);
+}
   });
 
   doc.save(`Compra_Global_15_Dias.pdf`);
