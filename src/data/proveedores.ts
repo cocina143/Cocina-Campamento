@@ -98,4 +98,92 @@ export function getProveedoresPorCampamento(proveedores: Proveedor[], campamento
 export function getEspecialidadLabel(especialidad: EspecialidadProveedor): string {
   const esp = ESPECIALIDADES.find((e) => e.id === especialidad);
   return esp ? `${esp.icon} ${esp.label}` : especialidad;
+  // ─── Clasificación de ingredientes por categoría ───────────
+const CLASIFICACION_INGREDIENTES: Record<EspecialidadProveedor, string[]> = {
+  carnes: ['pollo', 'cerdo', 'vacuno', 'ternera', 'cordero', 'carne', 'picada', 'chopped', 'jamón', 'jamon', 'chorizo', 'salchicha', 'bacon', 'pavo'],
+  pescados: ['pescado', 'bacalao', 'merluza', 'atún', 'atun', 'salmón', 'salmon', 'sardina', 'gamba', 'langostino', 'mejillón', 'mejillon', 'calamar', 'pulpo', 'marisco'],
+  verduras: ['cebolla', 'tomate', 'patata', 'pimiento', 'zanahoria', 'lechuga', 'pepino', 'calabacín', 'calabacin', 'berenjena', 'ajo', 'perejil', 'espinaca', 'acelga', 'brócoli', 'brocoli', 'coliflor', 'judía', 'judia', 'guisante', 'verdura', 'ensalada'],
+  lacteos: ['leche', 'queso', 'yogur', 'nata', 'mantequilla', 'crema', 'requesón', 'requeson', 'mozzarella', 'parmesano', 'manchego'],
+  panaderia: ['pan', 'baguette', 'boll', 'croissant', 'bollería', 'bolleria', 'harina'],
+  seco: ['arroz', 'pasta', 'macarrones', 'espagueti', 'cuscús', 'cuscus', 'legumbre', 'lenteja', 'garbanzo', 'alubia', 'azúcar', 'azucar', 'sal', 'pimienta', 'aceite', 'vinagre', 'conserva', 'tomate frito', 'caldo'],
+  congelados: ['congelado', 'helado', 'patatas fritas congeladas', 'croqueta'],
+  bebidas: ['agua', 'zumo', 'refresco', 'cola', 'cerveza', 'vino', 'café', 'cafe', 'té', 'te', 'infusión', 'infusion', 'chocolate'],
+  limpieza: ['detergente', 'lejía', 'lejia', 'jabón', 'jabon', 'estropajo', 'papel', 'film', 'aluminio', 'bolsa'],
+  otros: [],
+};
+
+export function clasificarIngrediente(nombreIngrediente: string): EspecialidadProveedor {
+  const nombre = nombreIngrediente.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  
+  for (const [categoria, palabras] of Object.entries(CLASIFICACION_INGREDIENTES)) {
+    if (categoria === 'otros') continue;
+    if (palabras.some((p) => nombre.includes(p.normalize('NFD').replace(/[\u0300-\u036f]/g, '')))) {
+      return categoria as EspecialidadProveedor;
+    }
+  }
+  return 'otros';
+}
+
+// ─── Agrupar ingredientes del menú por proveedor ───────────
+export function agruparIngredientesPorProveedor(
+  ingredientes: { nombre: string; cantidad: number; unidad: string }[],
+  proveedores: Proveedor[]
+): { proveedor: Proveedor; ingredientes: { nombre: string; cantidad: number; unidad: string }[] }[] {
+  // Agrupar ingredientes por categoría
+  const porCategoria: Record<EspecialidadProveedor, { nombre: string; cantidad: number; unidad: string }[]> = {};
+  
+  ingredientes.forEach((ing) => {
+    const categoria = clasificarIngrediente(ing.nombre);
+    if (!porCategoria[categoria]) porCategoria[categoria] = [];
+    
+    // Sumar si ya existe (misma nombre y unidad)
+    const existente = porCategoria[categoria].find(
+      (i) => i.nombre.toLowerCase() === ing.nombre.toLowerCase() && i.unidad === ing.unidad
+    );
+    if (existente) {
+      existente.cantidad += ing.cantidad;
+    } else {
+      porCategoria[categoria].push({ ...ing });
+    }
+  });
+
+  // Asignar cada categoría a los proveedores que la suministran
+  const resultado: { proveedor: Proveedor; ingredientes: { nombre: string; cantidad: number; unidad: string }[] }[] = [];
+  
+  proveedores.forEach((prov) => {
+    const ingredientesDelProveedor: { nombre: string; cantidad: number; unidad: string }[] = [];
+    
+    prov.especialidades.forEach((esp) => {
+      if (porCategoria[esp]) {
+        ingredientesDelProveedor.push(...porCategoria[esp]);
+      }
+    });
+    
+    if (ingredientesDelProveedor.length > 0) {
+      resultado.push({
+        proveedor: prov,
+        ingredientes: ingredientesDelProveedor.sort((a, b) => a.nombre.localeCompare(b.nombre)),
+      });
+    }
+  });
+
+  // Ingredientes sin clasificar (categoría "otros") → agrupar en "Sin proveedor asignado"
+  if (porCategoria['otros'] && porCategoria['otros'].length > 0) {
+    resultado.push({
+      proveedor: {
+        id: 'sin-proveedor',
+        nombre: '⚠️ Sin proveedor asignado',
+        telefono: '',
+        email: '',
+        especialidades: ['otros'],
+        direccion: '',
+        notas: 'Estos ingredientes no encajan en ninguna categoría de proveedor.',
+        campamentos: [],
+      },
+      ingredientes: porCategoria['otros'].sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    });
+  }
+
+  return resultado;
+}
 }
