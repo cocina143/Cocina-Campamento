@@ -860,7 +860,7 @@ export default function App() {
         />
       )}
       {/* Vista dedicada de Proveedores */}
-           {showProveedores && (
+               {showProveedores && (
         <ProveedoresView
           proveedores={proveedoresList}
           campamentos={campamentosList}
