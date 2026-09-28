@@ -16,6 +16,10 @@ import { SectionPanel } from '@/components/SectionPanel';
 import { generateDailyShoppingPDF, generateGlobalShoppingPDF } from '@/services/pdfService';
 import { getPersonasFromSupabase, savePersonaToSupabase, detectAllergenConflicts, type Persona, type TipoDieta } from '@/data/personas';
 import { PeopleManagerModal } from '@/components/PeopleManagerModal';
+import { getProveedoresFromSupabase, saveProveedorToSupabase, deleteProveedorFromSupabase, type Proveedor } from '@/data/proveedores';
+import { PinModal } from '@/components/PinModal';
+import { ProveedoresView } from '@/components/ProveedoresView';
+import { Package } from 'lucide-react';
 import type { SectionCounts } from '@/data/sections';
 import { DEFAULT_COUNTS, totalPeople, SECTIONS } from '@/data/sections';
 import { 
@@ -90,7 +94,9 @@ export default function App() {
   const [showPeopleManager, setShowPeopleManager] = useState(false);
   const [personasList, setPersonasList] = useState<Persona[]>([]);
   const [isSynced, setIsSynced] = useState<boolean>(true);
-
+  const [proveedoresList, setProveedoresList] = useState<Proveedor[]>([]);
+  const [showProveedores, setShowProveedores] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
   const [checkedIngredients, setCheckedIngredients] = useState<Set<string>>(() => {
     try {
       const raw = localStorage.getItem(CHECKED_KEY);
@@ -170,7 +176,14 @@ export default function App() {
         console.warn('Modo Offline: usando comensales locales', err);
       }
     }
-
+    async function fetchRemoteProveedores() {
+      try {
+        const remoteProveedores = await getProveedoresFromSupabase();
+        setProveedoresList(remoteProveedores);
+      } catch (err) {
+        console.warn('Modo Offline: sin proveedores cargados', err);
+      }
+    }
     async function fetchRemotePersonas() {
       try {
         const remotePersonas = await getPersonasFromSupabase();
@@ -184,7 +197,7 @@ export default function App() {
     fetchRemoteMenu();
     fetchRemoteCounts();
     fetchRemotePersonas();
-
+    fetchRemoteProveedores();
     const dishesSubscription = supabase
       .channel('public:dishes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'dishes' }, () => {
@@ -212,12 +225,18 @@ export default function App() {
         fetchRemotePersonas();
       })
       .subscribe();
-
+    const proveedoresSubscription = supabase
+      .channel('public:proveedores')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'proveedores' }, () => {
+        fetchRemoteProveedores();
+      })
+      .subscribe();
     return () => {
       supabase.removeChannel(dishesSubscription);
       supabase.removeChannel(menuSubscription);
       supabase.removeChannel(countsSubscription);
       supabase.removeChannel(personasSubscription);
+      supabase.removeChannel(proveedoresSubscription);
     };
   }, []);
 
@@ -283,7 +302,33 @@ export default function App() {
       setIsSynced(false);
     }
   };
+  const handleSaveProveedor = async (proveedor: Proveedor) => {
+    try {
+      await saveProveedorToSupabase(proveedor);
+      const updated = await getProveedoresFromSupabase();
+      setProveedoresList(updated);
+      setIsSynced(true);
+    } catch (e) {
+      console.warn('Error al sincronizar proveedor:', e);
+      setIsSynced(false);
+    }
+  };
 
+  const handleDeleteProveedor = async (id: string) => {
+    try {
+      await deleteProveedorFromSupabase(id);
+      const updated = await getProveedoresFromSupabase();
+      setProveedoresList(updated);
+      setIsSynced(true);
+    } catch (e) {
+      console.warn('Error al eliminar proveedor:', e);
+      setIsSynced(false);
+    }
+  };
+
+  const handleProveedoresClick = () => {
+    setShowPinModal(true);
+  };
   const handleSavePersonas = async (newPersonas: Persona[]) => {
     setPersonasList(newPersonas);
     try {
@@ -542,6 +587,14 @@ export default function App() {
                 <ShoppingBag className="w-3.5 h-3.5" />
                 <span>PDF 15 Días</span>
               </button>
+              {/* Botón Proveedores */}
+              <button
+                onClick={handleProveedoresClick}
+                className="flex items-center justify-center gap-1.5 bg-purple-700 text-white rounded-xl px-3 py-2 text-xs font-bold hover:bg-purple-800 transition-all shadow-sm flex-1 sm:flex-initial"
+              >
+                <Package className="w-3.5 h-3.5" />
+                <span>Proveedores</span>
+              </button>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -757,7 +810,26 @@ export default function App() {
           onClose={() => setShowPeopleManager(false)}
         />
       )}
+      {/* Vista dedicada de Proveedores */}
+      {showProveedores && (
+        <ProveedoresView
+          proveedores={proveedoresList}
+          onSaveProveedor={handleSaveProveedor}
+          onDeleteProveedor={handleDeleteProveedor}
+          onBack={() => setShowProveedores(false)}
+        />
+      )}
 
+      {/* Modal PIN */}
+      {showPinModal && (
+        <PinModal
+          onSuccess={() => {
+            setShowPinModal(false);
+            setShowProveedores(true);
+          }}
+          onCancel={() => setShowPinModal(false)}
+        />
+      )}
       {selectedDish && (
         <DishModal
           dish={selectedDish}
