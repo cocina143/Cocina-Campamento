@@ -41,9 +41,9 @@ export async function getProveedoresFromSupabase(): Promise<Proveedor[]> {
     nombre: p.nombre || '',
     telefono: p.telefono || '',
     email: p.email || '',
-    especialidades: Array.isArray(p.especialidades) 
+        especialidades: Array.isArray(p.especialidades) 
       ? p.especialidades.filter((e: string) => ESPECIALIDADES.some(esp => esp.id === e))
-      : ['otros'],
+      : [],
     direccion: p.direccion || '',
     notas: p.notas || '',
     campamentos: Array.isArray(p.campamentos) ? p.campamentos : [],
@@ -56,7 +56,7 @@ export async function saveProveedorToSupabase(proveedor: Proveedor): Promise<voi
     nombre: proveedor.nombre,
     telefono: proveedor.telefono,
     email: proveedor.email,
-    especialidades: proveedor.especialidades?.length ? proveedor.especialidades : ['otros'],
+        especialidades: proveedor.especialidades || [],
     direccion: proveedor.direccion,
     notas: proveedor.notas,
     campamentos: proveedor.campamentos || [],
