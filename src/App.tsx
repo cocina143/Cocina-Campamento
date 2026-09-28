@@ -395,7 +395,7 @@ export default function App() {
   const dishConflicts = useMemo(() => {
     const conflictMap = new Map<string, { persona: Persona; alergiasCoincidentes: string[] }[]>();
     allVisibleDishes.forEach((dish) => {
-            const conflicts = detectAllergenConflicts(dish, personasList);
+      const conflicts = detectAllergenConflicts(dish, personasList);
       if (conflicts.length > 0) {
         conflictMap.set(dish.id, conflicts);
       }
@@ -410,7 +410,7 @@ export default function App() {
     const detalles: { persona: string; alergias: string[]; platos: string[] }[] = [];
 
     allVisibleDishes.forEach((dish) => {
-            const conflicts = detectAllergenConflicts(dish, personasList);
+      const conflicts = detectAllergenConflicts(dish, personasList);
       if (conflicts.length > 0) {
         platosAfectados.add(dish.name);
         conflicts.forEach((c) => {
@@ -447,7 +447,7 @@ export default function App() {
     <div className="min-h-screen bg-stone-50 text-stone-900">
       <Header counts={counts} date={date} />
 
-            {/* Barra de control */}
+      {/* Barra de control compacta */}
       <section className="sticky top-0 z-30 bg-stone-50/95 backdrop-blur-md border-b border-stone-200/60">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
@@ -456,7 +456,7 @@ export default function App() {
                 onClick={() => setShowSectionPanel(true)}
                 className="flex items-center gap-2 bg-white rounded-xl border border-stone-200 shadow-sm px-3 py-2 hover:border-orange-300 hover:shadow-md transition-all flex-1 sm:flex-initial"
               >
-                                <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
                   <Users className="w-4 h-4 text-orange-600" />
                 </div>
                 <div className="flex-1 text-left">
@@ -469,7 +469,7 @@ export default function App() {
                 </div>
               </button>
 
-                            {/* Botón de Alergias */}
+              {/* Botón de Alergias */}
               <button
                 onClick={() => setShowPeopleManager(true)}
                 className="flex items-center gap-2 bg-white rounded-xl border border-stone-200 shadow-sm px-3 py-2 hover:border-red-300 hover:shadow-md transition-all flex-1 sm:flex-initial"
@@ -487,16 +487,16 @@ export default function App() {
                 </div>
               </button>
 
-              <div className="flex items-center gap-2 bg-white border border-stone-200 rounded-2xl px-3 py-2.5 shadow-sm">
-                <Calendar className="w-4 h-4 text-orange-600" />
+              <div className="flex items-center gap-1.5 bg-white border border-stone-200 rounded-xl px-2.5 py-1.5 shadow-sm">
+                <Calendar className="w-3.5 h-3.5 text-orange-600" />
                 <select
                   value={selectedCampDay}
                   onChange={(e) => setSelectedCampDay(Number(e.target.value))}
-                  className="bg-transparent text-sm font-bold text-stone-800 focus:outline-none cursor-pointer"
+                  className="bg-transparent text-xs font-bold text-stone-800 focus:outline-none cursor-pointer"
                 >
                   {menuList.map((m) => (
                     <option key={m.day} value={m.day}>
-                      Día {m.day} del Campamento
+                      Día {m.day}
                     </option>
                   ))}
                 </select>
@@ -504,48 +504,48 @@ export default function App() {
 
               <button
                 onClick={() => setShowMenuPlanner(true)}
-                className="flex items-center justify-center gap-2 bg-orange-600 text-white rounded-2xl px-4 py-3 sm:py-2.5 text-sm font-bold hover:bg-orange-700 transition-all shadow-sm flex-1 sm:flex-initial"
+                className="flex items-center justify-center gap-1.5 bg-orange-600 text-white rounded-xl px-3 py-2 text-xs font-bold hover:bg-orange-700 transition-all shadow-sm flex-1 sm:flex-initial"
               >
-                <Calendar className="w-4 h-4" />
-                <span>Planificar 15 Días</span>
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Planificar</span>
               </button>
 
               <button
                 onClick={() => setShowDishManager(true)}
-                className="flex items-center justify-center gap-2 bg-stone-900 text-white rounded-2xl px-4 py-3 sm:py-2.5 text-sm font-bold hover:bg-stone-800 transition-all shadow-sm flex-1 sm:flex-initial"
+                className="flex items-center justify-center gap-1.5 bg-stone-900 text-white rounded-xl px-3 py-2 text-xs font-bold hover:bg-stone-800 transition-all shadow-sm flex-1 sm:flex-initial"
               >
-                <Utensils className="w-4 h-4 text-orange-400" />
-                <span>Editar Platos</span>
+                <Utensils className="w-3.5 h-3.5 text-orange-400" />
+                <span>Editar</span>
               </button>
 
               {/* Botón PDF del Día */}
-                            <button
+              <button
                 onClick={() => {
                   const currentDayMenu = menuList.find((m) => m.day === selectedCampDay);
                   if (currentDayMenu) {
                     generateDailyShoppingPDF(currentDayMenu, dishesList, counts, personasList);
                   }
                 }}
-                className="flex items-center justify-center gap-2 bg-emerald-600 text-white rounded-2xl px-4 py-3 sm:py-2.5 text-sm font-bold hover:bg-emerald-700 transition-all shadow-sm flex-1 sm:flex-initial"
+                className="flex items-center justify-center gap-1.5 bg-emerald-600 text-white rounded-xl px-3 py-2 text-xs font-bold hover:bg-emerald-700 transition-all shadow-sm flex-1 sm:flex-initial"
               >
-                <FileDown className="w-4 h-4" />
+                <FileDown className="w-3.5 h-3.5" />
                 <span>PDF Día</span>
               </button>
 
               {/* Botón PDF Global 15 días */}
-                            <button
+              <button
                 onClick={() => {
                   generateGlobalShoppingPDF(menuList, dishesList, counts, personasList);
                 }}
-                className="flex items-center justify-center gap-2 bg-teal-700 text-white rounded-2xl px-4 py-3 sm:py-2.5 text-sm font-bold hover:bg-teal-800 transition-all shadow-sm flex-1 sm:flex-initial"
+                className="flex items-center justify-center gap-1.5 bg-teal-700 text-white rounded-xl px-3 py-2 text-xs font-bold hover:bg-teal-800 transition-all shadow-sm flex-1 sm:flex-initial"
               >
-                <ShoppingBag className="w-4 h-4" />
+                <ShoppingBag className="w-3.5 h-3.5" />
                 <span>PDF 15 Días</span>
               </button>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-                            {(['General', 'Halal', 'Vegetariano'] as FilterCategory[]).map((cat) => (
+              {(['General', 'Halal', 'Vegetariano'] as FilterCategory[]).map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setFilter(cat)}
@@ -561,24 +561,24 @@ export default function App() {
             </div>
           </div>
 
-          <div className="mt-3 flex items-center justify-between text-sm text-stone-500">
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5">
-                <Flame className="w-4 h-4 text-orange-500" />
+          <div className="mt-1.5 flex items-center justify-between text-xs text-stone-500">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1">
+                <Flame className="w-3.5 h-3.5 text-orange-500" />
                 {allVisibleDishes.length} platos
               </span>
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-green-500" />
-                {checkedCount}/{totalIngredients} ingredientes revisados
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                {checkedCount}/{totalIngredients} revisados
               </span>
             </div>
 
             {checkedCount > 0 && (
               <button
                 onClick={clearAllChecked}
-                className="text-xs text-stone-400 hover:text-stone-600 underline transition-colors"
+                className="text-[10px] text-stone-400 hover:text-stone-600 underline transition-colors"
               >
-                Reiniciar marcas
+                Reiniciar
               </button>
             )}
           </div>
@@ -659,14 +659,13 @@ export default function App() {
                     const conflicts = dishConflicts.get(dish.id);
                     return (
                       <div key={dish.id} className="flex flex-col gap-2">
-                     <DishCard
-                        key={dish.id}
-                        dish={dish}
-                        counts={counts}
-                        checkedCount={dishChecked}
-                        onClick={() => setSelectedDish(dish)}
-                        personas={personasList}
-                      />
+                        <DishCard
+                          dish={dish}
+                          counts={counts}
+                          checkedCount={dishChecked}
+                          onClick={() => setSelectedDish(dish)}
+                          personas={personasList}
+                        />
                         {/* Alerta de alergias si hay conflictos */}
                         {conflicts && conflicts.length > 0 && (
                           <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
@@ -759,7 +758,7 @@ export default function App() {
         />
       )}
 
-            {selectedDish && (
+      {selectedDish && (
         <DishModal
           dish={selectedDish}
           counts={counts}
