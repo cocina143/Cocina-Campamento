@@ -302,6 +302,37 @@ export default function App() {
       setIsSynced(false);
     }
   };
+    const handleSaveCampamento = async (campamento: Campamento) => {
+    console.log('🎯 handleSaveCampamento llamado con:', campamento);
+    try {
+      console.log('📞 Llamando a saveCampamentoToSupabase...');
+      await saveCampamentoToSupabase(campamento);
+      console.log('✅ Guardado en Supabase, recargando lista...');
+      const updated = await getCampamentosFromSupabase();
+      console.log('📋 Lista actualizada:', updated);
+      setCampamentosList(updated);
+      setIsSynced(true);
+      console.log('✅ Estado actualizado correctamente');
+    } catch (e: any) {
+      console.error('❌ Error al sincronizar campamento:', e);
+      alert(`Error al guardar: ${e?.message || 'Desconocido'}`);
+      setIsSynced(false);
+    }
+  };
+
+  const handleDeleteCampamento = async (id: string) => {
+    console.log('🗑️ handleDeleteCampamento llamado con ID:', id);
+    try {
+      await deleteCampamentoFromSupabase(id);
+      const updated = await getCampamentosFromSupabase();
+      setCampamentosList(updated);
+      setIsSynced(true);
+    } catch (e: any) {
+      console.error('❌ Error al eliminar campamento:', e);
+      alert(`Error al eliminar: ${e?.message || 'Desconocido'}`);
+      setIsSynced(false);
+    }
+  };
   const handleSaveProveedor = async (proveedor: Proveedor) => {
     try {
       await saveProveedorToSupabase(proveedor);
@@ -816,6 +847,8 @@ export default function App() {
           proveedores={proveedoresList}
           onSaveProveedor={handleSaveProveedor}
           onDeleteProveedor={handleDeleteProveedor}
+          onSaveCampamento={handleSaveCampamento}
+          onDeleteCampamento={handleDeleteCampamento}
           onBack={() => setShowProveedores(false)}
         />
       )}
