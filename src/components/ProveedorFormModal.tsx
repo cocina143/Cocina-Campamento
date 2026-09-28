@@ -1,24 +1,27 @@
 import { useState, useEffect } from 'react';
 import type { Proveedor, EspecialidadProveedor } from '@/data/proveedores';
+import type { Campamento } from '@/data/campamentos';
 import { ESPECIALIDADES } from '@/data/proveedores';
 import { X, Save, Trash2 } from 'lucide-react';
 
 interface ProveedorFormModalProps {
   proveedor: Proveedor | null;
+  campamentos: Campamento[];
   onSave: (proveedor: Proveedor) => void;
   onDelete?: (id: string) => void;
   onClose: () => void;
 }
 
-export function ProveedorFormModal({ proveedor, onSave, onDelete, onClose }: ProveedorFormModalProps) {
+export function ProveedorFormModal({ proveedor, campamentos, onSave, onDelete, onClose }: ProveedorFormModalProps) {
   const [form, setForm] = useState<Proveedor>({
     id: Date.now().toString(),
     nombre: '',
     telefono: '',
     email: '',
-    especialidad: 'otros',
+    especialidades: ['otros'],
     direccion: '',
     notas: '',
+    campamentos: [],
   });
 
   useEffect(() => {
@@ -30,6 +33,10 @@ export function ProveedorFormModal({ proveedor, onSave, onDelete, onClose }: Pro
       alert('El nombre es obligatorio');
       return;
     }
+    if (form.especialidades.length === 0) {
+      alert('Selecciona al menos una especialidad');
+      return;
+    }
     onSave(form);
   };
 
@@ -37,6 +44,22 @@ export function ProveedorFormModal({ proveedor, onSave, onDelete, onClose }: Pro
     if (proveedor && onDelete && confirm(`¿Eliminar a "${proveedor.nombre}"?`)) {
       onDelete(proveedor.id);
     }
+  };
+
+  const toggleEspecialidad = (espId: EspecialidadProveedor) => {
+    const current = form.especialidades || [];
+    const updated = current.includes(espId)
+      ? current.filter((e) => e !== espId)
+      : [...current, espId];
+    setForm({ ...form, especialidades: updated });
+  };
+
+  const toggleCampamento = (campamentoId: string) => {
+    const current = form.campamentos || [];
+    const updated = current.includes(campamentoId)
+      ? current.filter((id) => id !== campamentoId)
+      : [...current, campamentoId];
+    setForm({ ...form, campamentos: updated });
   };
 
   return (
@@ -64,24 +87,61 @@ export function ProveedorFormModal({ proveedor, onSave, onDelete, onClose }: Pro
           </div>
 
           <div>
-            <label className="text-xs font-bold text-stone-600 block mb-1">Especialidad</label>
+            <label className="text-xs font-bold text-stone-600 block mb-1">
+              Categorías de productos * <span className="font-normal text-stone-400">(puedes seleccionar varias)</span>
+            </label>
             <div className="grid grid-cols-2 gap-2">
-              {ESPECIALIDADES.map((esp) => (
-                <button
-                  key={esp.id}
-                  type="button"
-                  onClick={() => setForm({ ...form, especialidad: esp.id as EspecialidadProveedor })}
-                  className={`p-2 rounded-xl border text-xs font-semibold text-left transition-all ${
-                    form.especialidad === esp.id
-                      ? 'bg-orange-100 border-orange-400 text-orange-800 shadow-sm'
-                      : 'bg-white border-stone-200 text-stone-600 hover:border-stone-300'
-                  }`}
-                >
-                  <span className="mr-1">{esp.icon}</span>
-                  {esp.label}
-                </button>
-              ))}
+              {ESPECIALIDADES.map((esp) => {
+                const isSelected = (form.especialidades || []).includes(esp.id);
+                return (
+                  <button
+                    key={esp.id}
+                    type="button"
+                    onClick={() => toggleEspecialidad(esp.id as EspecialidadProveedor)}
+                    className={`p-2 rounded-xl border text-xs font-semibold text-left transition-all ${
+                      isSelected
+                        ? 'bg-orange-100 border-orange-400 text-orange-800 shadow-sm'
+                        : 'bg-white border-stone-200 text-stone-600 hover:border-stone-300'
+                    }`}
+                  >
+                    <span className="mr-1">{esp.icon}</span>
+                    {esp.label}
+                  </button>
+                );
+              })}
             </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-stone-600 block mb-1">
+              Campamentos asociados <span className="font-normal text-stone-400">(puedes seleccionar varios)</span>
+            </label>
+            {campamentos.length === 0 ? (
+              <p className="text-xs text-stone-500 italic">No hay campamentos registrados. Crea uno primero.</p>
+            ) : (
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {campamentos.map((camp) => {
+                  const isSelected = (form.campamentos || []).includes(camp.id);
+                  return (
+                    <button
+                      key={camp.id}
+                      type="button"
+                      onClick={() => toggleCampamento(camp.id)}
+                      className={`w-full p-2.5 rounded-xl border text-left text-sm transition-all ${
+                        isSelected
+                          ? 'bg-purple-100 border-purple-400 text-purple-800 shadow-sm'
+                          : 'bg-white border-stone-200 text-stone-600 hover:border-stone-300'
+                      }`}
+                    >
+                      <div className="font-semibold">{camp.nombre}</div>
+                      <div className="text-xs opacity-75">
+                        {camp.anio} · {camp.ubicacion || 'Sin ubicación'}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
