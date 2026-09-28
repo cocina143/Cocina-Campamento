@@ -127,11 +127,18 @@ export function clasificarIngrediente(nombreIngrediente: string): EspecialidadPr
   return 'otros';
 }
 
+export interface IngredienteAgrupado {
+  nombre: string;
+  cantidad: number;
+  unidad: string;
+  tambienEn?: string[]; // Nombres de otros proveedores que también lo suministran
+}
+
 export function agruparIngredientesPorProveedor(
   ingredientes: { nombre: string; cantidad: number; unidad: string }[],
   proveedores: Proveedor[]
-): { proveedor: Proveedor; ingredientes: { nombre: string; cantidad: number; unidad: string }[] }[] {
-  const porCategoria: Record<EspecialidadProveedor, { nombre: string; cantidad: number; unidad: string }[]> = {};
+): { proveedor: Proveedor; ingredientes: IngredienteAgrupado[] }[] {
+  const porCategoria: Record<EspecialidadProveedor, IngredienteAgrupado[]> = {};
   
   ingredientes.forEach((ing) => {
     const categoria = clasificarIngrediente(ing.nombre);
@@ -143,14 +150,14 @@ export function agruparIngredientesPorProveedor(
     if (existente) {
       existente.cantidad += ing.cantidad;
     } else {
-      porCategoria[categoria].push({ ...ing });
+      porCategoria[categoria].push({ nombre: ing.nombre, cantidad: ing.cantidad, unidad: ing.unidad });
     }
   });
 
-  const resultado: { proveedor: Proveedor; ingredientes: { nombre: string; cantidad: number; unidad: string }[] }[] = [];
+  const resultado: { proveedor: Proveedor; ingredientes: IngredienteAgrupado[] }[] = [];
   
   proveedores.forEach((prov) => {
-    const ingredientesDelProveedor: { nombre: string; cantidad: number; unidad: string }[] = [];
+    const ingredientesDelProveedor: IngredienteAgrupado[] = [];
     
     prov.especialidades.forEach((esp) => {
       if (porCategoria[esp]) {
@@ -166,6 +173,26 @@ export function agruparIngredientesPorProveedor(
     }
   });
 
+  // ─── DETECCIÓN DE DUPLICADOS ENTRE PROVEEDORES ───
+  const mapaIngredientes = new Map<string, string[]>();
+  resultado.forEach(grupo => {
+    grupo.ingredientes.forEach(ing => {
+      const key = ing.nombre.toLowerCase().trim();
+      if (!mapaIngredientes.has(key)) mapaIngredientes.set(key, []);
+      mapaIngredientes.get(key)!.push(grupo.proveedor.nombre);
+    });
+  });
+
+  resultado.forEach(grupo => {
+    grupo.ingredientes.forEach(ing => {
+      const key = ing.nombre.toLowerCase().trim();
+      const otrosProveedores = (mapaIngredientes.get(key) || []).filter(p => p !== grupo.proveedor.nombre);
+      if (otrosProveedores.length > 0) {
+        ing.tambienEn = otrosProveedores;
+      }
+    });
+  });
+
   if (porCategoria['otros'] && porCategoria['otros'].length > 0) {
     resultado.push({
       proveedor: {
@@ -175,7 +202,7 @@ export function agruparIngredientesPorProveedor(
         email: '',
         especialidades: ['otros'],
         direccion: '',
-        notas: 'Estos ingredientes no encajan en ninguna categoría de proveedor.',
+        notas: 'Estos ingredientes no encajan en ninguna categoría.',
         campamentos: [],
       },
       ingredientes: porCategoria['otros'].sort((a, b) => a.nombre.localeCompare(b.nombre)),
