@@ -31,9 +31,10 @@ export interface Proveedor {
   nombre: string;
   telefono: string;
   email: string;
-  especialidad: EspecialidadProveedor;
+  especialidades: EspecialidadProveedor[]; // Array de especialidades
   direccion: string;
   notas: string;
+  campamentos: string[]; // Array de UUIDs de campamentos
 }
 
 // ─── Función para verificar si un string es un UUID válido ────
@@ -60,26 +61,27 @@ export async function getProveedoresFromSupabase(): Promise<Proveedor[]> {
     nombre: p.nombre || '',
     telefono: p.telefono || '',
     email: p.email || '',
-    especialidad: (ESPECIALIDADES.some(e => e.id === p.especialidad) ? p.especialidad : 'otros') as EspecialidadProveedor,
+    especialidades: Array.isArray(p.especialidades) 
+      ? p.especialidades.filter((e: string) => ESPECIALIDADES.some(esp => esp.id === e))
+      : ['otros'],
     direccion: p.direccion || '',
     notas: p.notas || '',
+    campamentos: Array.isArray(p.campamentos) ? p.campamentos : [],
   }));
 }
 
 export async function saveProveedorToSupabase(proveedor: Proveedor): Promise<void> {
-  // Datos a guardar (sin el id si es nuevo)
   const datosAGuardar: any = {
     nombre: proveedor.nombre,
     telefono: proveedor.telefono,
     email: proveedor.email,
-    especialidad: proveedor.especialidad,
+    especialidades: proveedor.especialidades || ['otros'],
     direccion: proveedor.direccion,
     notas: proveedor.notas,
+    campamentos: proveedor.campamentos || [],
     updated_at: new Date().toISOString(),
   };
 
-  // Si el ID es un UUID válido, lo incluimos (es un proveedor existente)
-  // Si no, lo omitimos y Supabase generará uno nuevo automáticamente
   if (isValidUUID(proveedor.id)) {
     datosAGuardar.id = proveedor.id;
   }
@@ -112,7 +114,14 @@ export function getProveedoresPorEspecialidad(
   proveedores: Proveedor[],
   especialidad: EspecialidadProveedor
 ): Proveedor[] {
-  return proveedores.filter((p) => p.especialidad === especialidad);
+  return proveedores.filter((p) => p.especialidades.includes(especialidad));
+}
+
+export function getProveedoresPorCampamento(
+  proveedores: Proveedor[],
+  campamentoId: string
+): Proveedor[] {
+  return proveedores.filter((p) => p.campamentos.includes(campamentoId));
 }
 
 export function getEspecialidadLabel(especialidad: EspecialidadProveedor): string {
