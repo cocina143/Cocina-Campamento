@@ -13,7 +13,7 @@ import { DishManagerModal } from '@/components/DishManagerModal';
 import { MenuPlannerModal } from '@/components/MenuPlannerModal';
 import { Header } from '@/components/Header';
 import { SectionPanel } from '@/components/SectionPanel';
-import { generateDailyShoppingPDF, generateGlobalShoppingPDF } from '@/services/pdfService';
+import { generateDailyShoppingPDF, generateGlobalShoppingPDF, generateCompraPorProveedorPDF } from '@/services/pdfService';
 import { getPersonasFromSupabase, savePersonaToSupabase, detectAllergenConflicts, type Persona, type TipoDieta } from '@/data/personas';
 import { PeopleManagerModal } from '@/components/PeopleManagerModal';
 import { getProveedoresFromSupabase, saveProveedorToSupabase, deleteProveedorFromSupabase, type Proveedor } from '@/data/proveedores';
@@ -628,6 +628,19 @@ export default function App() {
               >
                 <FileDown className="w-3.5 h-3.5" />
                 <span>PDF Día</span>
+              </button>
+                            {/* Botón PDF por Proveedor */}
+              <button
+                onClick={() => {
+                  const currentDayMenu = menuList.find((m) => m.day === selectedCampDay);
+                  if (currentDayMenu) {
+                    generateCompraPorProveedorPDF(currentDayMenu, dishesList, counts, personasList, proveedoresList);
+                  }
+                }}
+                className="flex items-center justify-center gap-1.5 bg-indigo-600 text-white rounded-xl px-3 py-2 text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm flex-1 sm:flex-initial"
+              >
+                <Package className="w-3.5 h-3.5" />
+                <span>PDF Proveedores</span>
               </button>
 
               {/* Botón PDF Global 15 días */}
