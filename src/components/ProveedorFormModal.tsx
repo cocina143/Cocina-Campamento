@@ -13,12 +13,12 @@ interface ProveedorFormModalProps {
 }
 
 export function ProveedorFormModal({ proveedor, campamentos, onSave, onDelete, onClose }: ProveedorFormModalProps) {
-  const [form, setForm] = useState<Proveedor>({
+    const [form, setForm] = useState<Proveedor>({
     id: Date.now().toString(),
     nombre: '',
     telefono: '',
     email: '',
-    especialidades: ['otros'],
+    especialidades: [],
     direccion: '',
     notas: '',
     campamentos: [],
