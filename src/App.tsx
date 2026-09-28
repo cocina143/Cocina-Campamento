@@ -351,14 +351,18 @@ export default function App() {
       setIsSynced(false);
     }
   };
-  const handleSaveProveedor = async (proveedor: Proveedor) => {
+    const handleSaveProveedor = async (proveedor: Proveedor) => {
+    console.log('🎯 handleSaveProveedor llamado con:', proveedor);
     try {
       await saveProveedorToSupabase(proveedor);
+      console.log('✅ Guardado en Supabase, recargando lista...');
       const updated = await getProveedoresFromSupabase();
       setProveedoresList(updated);
       setIsSynced(true);
-    } catch (e) {
-      console.warn('Error al sincronizar proveedor:', e);
+      alert('✅ Proveedor guardado correctamente');
+    } catch (e: any) {
+      console.error('❌ Error al sincronizar proveedor:', e);
+      alert(`Error al guardar: ${e?.message || 'Desconocido'}`);
       setIsSynced(false);
     }
   };
