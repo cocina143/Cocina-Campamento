@@ -343,7 +343,13 @@ export function generateCompraPorProveedorPDF(
       autoTable(doc, {
         startY: currentY,
         head: [['Ingrediente', 'Cantidad', 'Unidad']],
-        body: grupo.ingredientes.map((ing) => [ing.nombre, formatQty(ing.cantidad, ing.unidad), ing.unidad]),
+                body: grupo.ingredientes.map((ing: any) => {
+          let nombreMostrar = ing.nombre;
+          if (ing.tambienEn && ing.tambienEn.length > 0) {
+            nombreMostrar += ` (también en: ${ing.tambienEn.join(', ')})`;
+          }
+          return [nombreMostrar, formatQty(ing.cantidad, ing.unidad), ing.unidad];
+        }),
         theme: 'grid',
         headStyles: { fillColor: [251, 146, 60], textColor: 255, fontStyle: 'bold', fontSize: 9 },
         alternateRowStyles: { fillColor: [255, 247, 237] },
