@@ -5,6 +5,7 @@ import type { DayMenu } from '@/data/menu';
 import type { SectionCounts } from '@/data/sections';
 import type { Persona, TipoDieta } from '@/data/personas';
 import { totalPeople, SECTIONS, effectiveMultiplier } from '@/data/sections';
+import { agruparIngredientesPorProveedor, type Proveedor } from '@/data/proveedores';
 
 interface ConsolidatedItem {
   name: string;
@@ -22,7 +23,6 @@ function getDietaDelPlato(dish: Dish): TipoDieta | null {
     noHalal.some((nh) => ing.name.toLowerCase().includes(nh))
   );
   
-  // Si NO tiene ingredientes prohibidos y el nombre sugiere halal, o si está marcado explícitamente
   if (!tieneNoHalal && (dish.name.toLowerCase().includes('halal') || dish.diets?.includes('halal' as any))) {
     return 'Halal';
   }
@@ -52,39 +52,28 @@ function getPersonasEfectivasParaPlato(dish: Dish, counts: SectionCounts, person
   const dietaDelPlato = getDietaDelPlato(dish);
   
   if (dietaDelPlato) {
-    // Plato Especial: Solo cuentan las personas con esa dieta específica
     let total = 0;
     personas.forEach((p) => {
       if (p.dieta === dietaDelPlato && p.seccion) {
         const section = SECTIONS.find(s => s.id === p.seccion);
-        if (section) {
-          total += effectiveMultiplier(section);
-        }
+        if (section) total += effectiveMultiplier(section);
       }
     });
     return total;
   } else {
-    // Plato General: Todos MENOS los que tienen dieta incompatible
     let totalGeneral = 0;
-    
-    // Primero calculamos el total base considerando multiplicadores de sección
     SECTIONS.forEach((s) => {
       const count = counts[s.id] || 0;
       totalGeneral += count * effectiveMultiplier(s);
     });
-
-    // Ahora restamos a las personas con dietas especiales que NO pueden comer este plato
     personas.forEach((p) => {
       if (p.dieta !== 'General' && p.seccion) {
         if (esIncompatibleConDieta(dish, p.dieta)) {
           const section = SECTIONS.find(s => s.id === p.seccion);
-          if (section) {
-            totalGeneral -= effectiveMultiplier(section);
-          }
+          if (section) totalGeneral -= effectiveMultiplier(section);
         }
       }
     });
-
     return Math.max(0, totalGeneral);
   }
 }
@@ -120,6 +109,7 @@ function formatQty(amount: number, unit: string): string {
   return `${rounded} ${unit}`;
 }
 
+// ─── PDF DIARIO ───
 export function generateDailyShoppingPDF(
   dayMenu: DayMenu,
   allDishes: Dish[],
@@ -130,7 +120,6 @@ export function generateDailyShoppingPDF(
   const doc = new jsPDF();
   let currentY = 20;
 
-  // Cabecera
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
   doc.text(campName, 14, currentY);
@@ -158,37 +147,26 @@ export function generateDailyShoppingPDF(
     const mealDishes = getDishesForMeal(dayMenu, meal.key, allDishes);
     if (mealDishes.length === 0) return;
 
-    // Título turno
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(234, 88, 12);
     doc.text(meal.label, 14, currentY);
     currentY += 5;
 
-    // Agrupar platos por tipo de dieta detectada
     const grupos: Record<string, { platos: Dish[]; maxComensales: number }> = {};
-    
     mealDishes.forEach((dish) => {
       const dieta = getDietaDelPlato(dish) || 'General';
       const comensales = getPersonasEfectivasParaPlato(dish, counts, personas);
-      
-      if (!grupos[dieta]) {
-        grupos[dieta] = { platos: [], maxComensales: 0 };
-      }
+      if (!grupos[dieta]) grupos[dieta] = { platos: [], maxComensales: 0 };
       grupos[dieta].platos.push(dish);
-      // Usamos el máximo de comensales encontrados para ese grupo de dieta
-      if (comensales > grupos[dieta].maxComensales) {
-        grupos[dieta].maxComensales = comensales;
-      }
+      if (comensales > grupos[dieta].maxComensales) grupos[dieta].maxComensales = comensales;
     });
 
     Object.entries(grupos).forEach(([dieta, data]) => {
-      if (data.maxComensales === 0) return; // No generar tabla si nadie come esto
-
+      if (data.maxComensales === 0) return;
       const ingredients = consolidateIngredients(data.platos, data.maxComensales);
       if (ingredients.length === 0) return;
 
-      // Subtítulo grupo
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(60, 60, 60);
@@ -210,58 +188,10 @@ export function generateDailyShoppingPDF(
     });
   });
 
-  // Resumen Total Día
-  if (currentY > 230) { doc.addPage(); currentY = 20; }
-  
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(234, 88, 12);
-  doc.text('RESUMEN TOTAL DEL DÍA', 14, currentY);
-  currentY += 8;
-
-  const todosPlatos = [
-    ...getDishesForMeal(dayMenu, 'desayuno', allDishes),
-    ...getDishesForMeal(dayMenu, 'comida', allDishes),
-    ...getDishesForMeal(dayMenu, 'merienda', allDishes),
-    ...getDishesForMeal(dayMenu, 'cena', allDishes),
-  ];
-
-  const gruposTotales: Record<string, { platos: Dish[]; maxComensales: number }> = {};
-  todosPlatos.forEach((dish) => {
-    const dieta = getDietaDelPlato(dish) || 'General';
-    const comensales = getPersonasEfectivasParaPlato(dish, counts, personas);
-    if (!gruposTotales[dieta]) gruposTotales[dieta] = { platos: [], maxComensales: 0 };
-    gruposTotales[dieta].platos.push(dish);
-    if (comensales > gruposTotales[dieta].maxComensales) gruposTotales[dieta].maxComensales = comensales;
-  });
-
-  Object.entries(gruposTotales).forEach(([dieta, data]) => {
-    if (data.maxComensales === 0) return;
-    const ingredients = consolidateIngredients(data.platos, data.maxComensales);
-    if (ingredients.length === 0) return;
-
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(60, 60, 60);
-    doc.text(`${dieta} (${data.maxComensales.toFixed(1)} raciones)`, 14, currentY);
-    currentY += 4;
-
-    autoTable(doc, {
-      startY: currentY,
-      head: [['Ingrediente', 'Total', 'Unidad']],
-      body: ingredients.map((item) => [item.name, formatQty(item.amount, item.unit), item.unit]),
-      theme: 'grid',
-      headStyles: { fillColor: [234, 88, 12], textColor: 255, fontStyle: 'bold' },
-      styles: { fontSize: 9, cellPadding: 2 },
-      columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 50, halign: 'right' }, 2: { cellWidth: 30, halign: 'center' } },
-      didDrawPage: (d) => { currentY = d.cursor.y + 5; },
-    });
-    currentY += 5;
-  });
-
   doc.save(`Compra_Dia_${dayMenu.day}.pdf`);
 }
 
+// ─── PDF GLOBAL 15 DÍAS ───
 export function generateGlobalShoppingPDF(
   menuList: DayMenu[],
   allDishes: Dish[],
@@ -291,25 +221,15 @@ export function generateGlobalShoppingPDF(
   const globalGrupos: Record<string, { platos: Dish[]; maxComensales: number }> = {};
 
   menuList.forEach((dayMenu) => {
-    const allMeals = [
-      ...(dayMenu.desayuno || []),
-      ...(dayMenu.comida || []),
-      ...(dayMenu.merienda || []),
-      ...(dayMenu.cena || []),
-    ];
+    const allMeals = [...(dayMenu.desayuno || []), ...(dayMenu.comida || []), ...(dayMenu.merienda || []), ...(dayMenu.cena || [])];
     const dayDishes = allDishes.filter((d) => allMeals.includes(d.id) || allMeals.includes(d.name));
     
     dayDishes.forEach((dish) => {
       const dieta = getDietaDelPlato(dish) || 'General';
       const comensales = getPersonasEfectivasParaPlato(dish, counts, personas);
-      
-      if (!globalGrupos[dieta]) {
-        globalGrupos[dieta] = { platos: [], maxComensales: 0 };
-      }
+      if (!globalGrupos[dieta]) globalGrupos[dieta] = { platos: [], maxComensales: 0 };
       globalGrupos[dieta].platos.push(dish);
-      if (comensales > globalGrupos[dieta].maxComensales) {
-        globalGrupos[dieta].maxComensales = comensales;
-      }
+      if (comensales > globalGrupos[dieta].maxComensales) globalGrupos[dieta].maxComensales = comensales;
     });
   });
 
@@ -337,9 +257,12 @@ export function generateGlobalShoppingPDF(
       didDrawPage: (d) => { currentY = d.cursor.y + 5; },
     });
     currentY += 5;
-    // ─── PDF de compra agrupado por proveedor ────────────────────
-import { agruparIngredientesPorProveedor, type Proveedor } from '@/data/proveedores';
+  });
 
+  doc.save(`Compra_Global_15_Dias.pdf`);
+}
+
+// ─── PDF COMPRA POR PROVEEDOR ───
 export function generateCompraPorProveedorPDF(
   dayMenu: DayMenu,
   allDishes: Dish[],
@@ -351,9 +274,7 @@ export function generateCompraPorProveedorPDF(
   const doc = new jsPDF();
   let currentY = 20;
 
-  // Recopilar todos los ingredientes del día
   const todosIngredientes: { nombre: string; cantidad: number; unidad: string }[] = [];
-  
   const meals: ('desayuno' | 'comida' | 'merienda' | 'cena')[] = ['desayuno', 'comida', 'merienda', 'cena'];
   
   meals.forEach((meal) => {
@@ -361,24 +282,16 @@ export function generateCompraPorProveedorPDF(
     const dayDishes = allDishes.filter((d) => dishIds.includes(d.id) || dishIds.includes(d.name));
     
     dayDishes.forEach((dish) => {
-      const dietaDelPlato = getDietaDelPlato(dish);
       const comensales = getPersonasEfectivasParaPlato(dish, counts, personas);
-      
       (dish.ingredients || []).forEach((ing) => {
         const qty = (Number(ing.amount) || 0) * comensales;
-        todosIngredientes.push({
-          nombre: ing.name,
-          cantidad: qty,
-          unidad: ing.unit || 'g',
-        });
+        todosIngredientes.push({ nombre: ing.name, cantidad: qty, unidad: ing.unit || 'g' });
       });
     });
   });
 
-  // Agrupar por proveedor
   const porProveedor = agruparIngredientesPorProveedor(todosIngredientes, proveedores);
 
-  // Cabecera
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
   doc.text(campName, 14, currentY);
@@ -405,7 +318,6 @@ export function generateCompraPorProveedorPDF(
         currentY = 20;
       }
 
-      // Cabecera del proveedor
       doc.setFillColor(234, 88, 12);
       doc.rect(14, currentY - 4, 182, 10, 'F');
       doc.setTextColor(255, 255, 255);
@@ -414,43 +326,32 @@ export function generateCompraPorProveedorPDF(
       doc.text(`${idx + 1}. ${grupo.proveedor.nombre}`, 17, currentY + 2);
       currentY += 10;
 
-      // Datos de contacto
       doc.setTextColor(60, 60, 60);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       
       const datosContacto: string[] = [];
-      if (grupo.proveedor.telefono) datosContacto.push(`📞 ${grupo.proveedor.telefono}`);
-      if (grupo.proveedor.email) datosContacto.push(`✉ ${grupo.proveedor.email}`);
-      if (grupo.proveedor.direccion) datosContacto.push(`📍 ${grupo.proveedor.direccion}`);
+      if (grupo.proveedor.telefono) datosContacto.push(`Tel: ${grupo.proveedor.telefono}`);
+      if (grupo.proveedor.email) datosContacto.push(`Email: ${grupo.proveedor.email}`);
+      if (grupo.proveedor.direccion) datosContacto.push(`Dir: ${grupo.proveedor.direccion}`);
       
       if (datosContacto.length > 0) {
         doc.text(datosContacto.join('   |   '), 17, currentY);
         currentY += 5;
       }
 
-      // Tabla de ingredientes
       autoTable(doc, {
         startY: currentY,
         head: [['Ingrediente', 'Cantidad', 'Unidad']],
-        body: grupo.ingredientes.map((ing) => [
-          ing.nombre,
-          formatQty(ing.cantidad, ing.unidad),
-          ing.unidad,
-        ]),
+        body: grupo.ingredientes.map((ing) => [ing.nombre, formatQty(ing.cantidad, ing.unidad), ing.unidad]),
         theme: 'grid',
         headStyles: { fillColor: [251, 146, 60], textColor: 255, fontStyle: 'bold', fontSize: 9 },
         alternateRowStyles: { fillColor: [255, 247, 237] },
         styles: { fontSize: 9, cellPadding: 2 },
-        columnStyles: {
-          0: { cellWidth: 100 },
-          1: { cellWidth: 45, halign: 'right' },
-          2: { cellWidth: 30, halign: 'center' },
-        },
+        columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 45, halign: 'right' }, 2: { cellWidth: 30, halign: 'center' } },
         didDrawPage: (d) => { currentY = d.cursor.y + 5; },
       });
 
-      // Total de productos
       currentY += 2;
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
@@ -460,7 +361,6 @@ export function generateCompraPorProveedorPDF(
     });
   }
 
-  // Pie de página
   const pageCount = (doc as any).lastAutoTable?.pageCount || 1;
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -471,8 +371,4 @@ export function generateCompraPorProveedorPDF(
   }
 
   doc.save(`Compra_Proveedores_Dia_${dayMenu.day}.pdf`);
-}
-  });
-
-  doc.save(`Compra_Global_15_Dias.pdf`);
 }
