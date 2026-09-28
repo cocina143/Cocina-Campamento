@@ -51,6 +51,7 @@ export async function getProveedoresFromSupabase(): Promise<Proveedor[]> {
 }
 
 export async function saveProveedorToSupabase(proveedor: Proveedor): Promise<void> {
+  console.log('💾 Guardando proveedor:', proveedor);
   const datos: any = {
     nombre: proveedor.nombre,
     telefono: proveedor.telefono,
@@ -61,10 +62,24 @@ export async function saveProveedorToSupabase(proveedor: Proveedor): Promise<voi
     campamentos: proveedor.campamentos || [],
     updated_at: new Date().toISOString(),
   };
-  if (isValidUUID(proveedor.id)) datos.id = proveedor.id;
 
-  const { error } = await supabase.from('proveedores').upsert(datos);
-  if (error) throw error;
+  let error;
+  if (isValidUUID(proveedor.id)) {
+    datos.id = proveedor.id;
+    console.log('📝 Actualizando proveedor existente, ID:', proveedor.id);
+    const res = await supabase.from('proveedores').upsert(datos, { onConflict: 'id' });
+    error = res.error;
+  } else {
+    console.log('✨ Insertando nuevo proveedor (Supabase generará el ID)');
+    const res = await supabase.from('proveedores').insert(datos);
+    error = res.error;
+  }
+
+  if (error) {
+    console.error('❌ Error guardando proveedor:', error);
+    throw error;
+  }
+  console.log('✅ Proveedor guardado correctamente en Supabase');
 }
 
 export async function deleteProveedorFromSupabase(id: string): Promise<void> {
@@ -72,7 +87,6 @@ export async function deleteProveedorFromSupabase(id: string): Promise<void> {
   if (error) throw error;
 }
 
-// ─── Helpers blindados ───────────────────────────────────────
 export function getProveedoresPorEspecialidad(proveedores: Proveedor[], especialidad: EspecialidadProveedor): Proveedor[] {
   return (proveedores || []).filter((p) => (p.especialidades || []).includes(especialidad));
 }
