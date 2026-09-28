@@ -28,11 +28,13 @@ export function CampamentoFormModal({ campamento, onSave, onDelete, onClose }: C
       return;
     }
     onSave(form);
+    onClose();
   };
 
   const handleDelete = () => {
     if (campamento && onDelete && confirm(`¿Eliminar "${campamento.nombre}"?`)) {
       onDelete(campamento.id);
+      onClose();
     }
   };
 
