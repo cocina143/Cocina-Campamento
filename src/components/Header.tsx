@@ -1,54 +1,45 @@
-import { ChefHat, Users } from 'lucide-react';
-import type { SectionCounts } from '@/data/sections';
 import { totalPeople } from '@/data/sections';
+import type { SectionCounts } from '@/data/sections';
+import { ChefHat, Calendar, Users } from 'lucide-react';
 
 interface HeaderProps {
   counts: SectionCounts;
   date: string;
 }
 
-function formatDate(dateStr: string): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-}
-
 export function Header({ counts, date }: HeaderProps) {
   const total = totalPeople(counts);
+  
+  // Formatear la fecha (ej: "Lunes, 28 de septiembre de 2026")
+  const fechaFormateada = new Date(date).toLocaleDateString('es-ES', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 
   return (
-    <header className="relative overflow-hidden bg-gradient-to-br from-stone-900 via-stone-800 to-orange-950 text-white">
-      <div
-        className="absolute inset-0 opacity-20"
-        style={{
-          backgroundImage:
-            'url(https://images.pexels.com/photos/31107959/pexels-photo-31107959.jpeg?auto=compress&cs=tinysrgb&h=650&w=940)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-stone-900/80 to-transparent" />
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-12 pb-8">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-11 h-11 rounded-xl bg-orange-500/20 border border-orange-400/30 flex items-center justify-center">
-            <ChefHat className="w-6 h-6 text-orange-400" />
+    <header className="bg-stone-900 text-white py-2.5 px-4 sm:px-6 shadow-md">
+      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <div className="bg-orange-600 p-1.5 rounded-lg">
+            <ChefHat className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Cocina La Milagrosa 143</h1>
-            <p className="text-stone-400 text-sm">Calculadora de ingredientes por secciones</p>
+            <h1 className="text-lg font-bold tracking-tight leading-none">Cocina La Milagrosa 143</h1>
+            <p className="text-stone-400 text-[11px] flex items-center gap-1 mt-0.5">
+              <Calendar className="w-3 h-3" />
+              {fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1)}
+            </p>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 border border-white/10">
-            <Users className="w-4 h-4 text-orange-400" />
-            <span className="text-orange-400 font-bold text-lg tabular-nums">{total}</span>
-            <span className="text-stone-300 text-sm">comensales en total</span>
+        
+        <div className="flex items-center gap-2 bg-stone-800 px-3 py-1.5 rounded-lg border border-stone-700">
+          <Users className="w-4 h-4 text-orange-400" />
+          <div className="text-right">
+            <p className="text-[10px] text-stone-400 uppercase font-semibold leading-none">Comensales</p>
+            <p className="text-base font-bold text-white leading-none">{total}</p>
           </div>
-          {date && (
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 border border-white/10">
-              <span className="text-stone-300 text-sm capitalize">{formatDate(date)}</span>
-            </div>
-          )}
         </div>
       </div>
     </header>
