@@ -18,6 +18,7 @@ import { getPersonasFromSupabase, savePersonaToSupabase, detectAllergenConflicts
 import { PeopleManagerModal } from '@/components/PeopleManagerModal';
 import { getProveedoresFromSupabase, saveProveedorToSupabase, deleteProveedorFromSupabase, type Proveedor } from '@/data/proveedores';
 import { PinModal } from '@/components/PinModal';
+import { getCampamentosFromSupabase, saveCampamentoToSupabase, deleteCampamentoFromSupabase, type Campamento } from '@/data/campamentos';
 import { ProveedoresView } from '@/components/ProveedoresView';
 import { Package } from 'lucide-react';
 import type { SectionCounts } from '@/data/sections';
@@ -97,6 +98,7 @@ export default function App() {
   const [proveedoresList, setProveedoresList] = useState<Proveedor[]>([]);
   const [showProveedores, setShowProveedores] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
+  const [campamentosList, setCampamentosList] = useState<Campamento[]>([]);
   const [checkedIngredients, setCheckedIngredients] = useState<Set<string>>(() => {
     try {
       const raw = localStorage.getItem(CHECKED_KEY);
