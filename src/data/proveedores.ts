@@ -36,6 +36,12 @@ export interface Proveedor {
   notas: string;
 }
 
+// ─── Función para verificar si un string es un UUID válido ────
+function isValidUUID(id: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+}
+
 // ─── Funciones CRUD ────────────────────────────────────────────
 
 export async function getProveedoresFromSupabase(): Promise<Proveedor[]> {
@@ -61,18 +67,26 @@ export async function getProveedoresFromSupabase(): Promise<Proveedor[]> {
 }
 
 export async function saveProveedorToSupabase(proveedor: Proveedor): Promise<void> {
+  // Datos a guardar (sin el id si es nuevo)
+  const datosAGuardar: any = {
+    nombre: proveedor.nombre,
+    telefono: proveedor.telefono,
+    email: proveedor.email,
+    especialidad: proveedor.especialidad,
+    direccion: proveedor.direccion,
+    notas: proveedor.notas,
+    updated_at: new Date().toISOString(),
+  };
+
+  // Si el ID es un UUID válido, lo incluimos (es un proveedor existente)
+  // Si no, lo omitimos y Supabase generará uno nuevo automáticamente
+  if (isValidUUID(proveedor.id)) {
+    datosAGuardar.id = proveedor.id;
+  }
+
   const { error } = await supabase
     .from('proveedores')
-    .upsert({
-      id: proveedor.id,
-      nombre: proveedor.nombre,
-      telefono: proveedor.telefono,
-      email: proveedor.email,
-      especialidad: proveedor.especialidad,
-      direccion: proveedor.direccion,
-      notas: proveedor.notas,
-      updated_at: new Date().toISOString(),
-    });
+    .upsert(datosAGuardar);
 
   if (error) {
     console.error(`❌ Error guardando proveedor "${proveedor.nombre}":`, error);
