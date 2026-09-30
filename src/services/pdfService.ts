@@ -29,22 +29,50 @@ function getDietaDelPlato(dish: Dish): TipoDieta | null {
   return null;
 }
 
+// ─── Lista exhaustiva de carnes y productos cárnicos ─────────
+const CARNES_Y_DERIVADOS = [
+  // Carnes frescas
+  'cerdo', 'pollo', 'vacuno', 'ternera', 'cordero', 'carne', 'buey', 'pavo', 'conejo', 'caballo', 'cabra',
+  // Cortes específicos
+  'solomillo', 'chuletón', 'entrecot', 'costilla', 'lomo', 'paletilla', 'falda', 'aguja', 'pescuezo',
+  // Embutidos y procesados
+  'jamon', 'jamón', 'serrano', 'ibérico', 'iberico', 'bacon', 'beicon', 'panceta', 'chorizo', 'salchichon', 'salchichón',
+  'salchicha', 'mortadela', 'fuet', 'lomo embuchado', 'cecina', 'mor cilla', 'morcilla', 'sobrasada', 'choped', 'paté', 'pate',
+  // Aves y caza
+  'pato', 'oca', 'codorniz', 'perdiz', 'faisán', 'faisan', 'venado', 'jabali', 'jabalí',
+  // Pescados y mariscos
+  'pescado', 'atun', 'atún', 'salmon', 'salmón', 'bacalao', 'merluza', 'sardina', 'boqueron', 'boquerón',
+  'gamba', 'langostino', 'mejillon', 'mejillón', 'calamar', 'pulpo', 'marisco', 'cangrejo', 'langosta', 'almeja',
+  // Caldos y extractos
+  'caldo de carne', 'caldo de pollo', 'extracto de carne', 'gelatina',
+  // Términos culinarios
+  'picada', 'picado', 'rehogado con carne', 'con carne', 'casero de carne',
+];
+
 function esIncompatibleConDieta(dish: Dish, dieta: TipoDieta): boolean {
   const ingredientes = (dish.ingredients || []).map((ing) => ing.name.toLowerCase());
-  const textoCompleto = [...ingredientes, dish.name.toLowerCase()].join(' ');
+  const nombrePlato = dish.name.toLowerCase();
+  const textoCompleto = [...ingredientes, nombrePlato].join(' ');
 
-  if (dieta === 'Vegetariano') {
-    const noVegetariano = ['cerdo', 'pollo', 'carne', 'vacuno', 'ternera', 'cordero', 'pescado', 'marisco', 'gamba', 'atun', 'salmon', 'bacalao', 'merluza', 'jamon', 'bacon', 'chorizo', 'salchicha'];
-    return noVegetariano.some((ing) => textoCompleto.includes(ing));
+  if (dieta === 'Vegetariano' || dieta === 'Vegano') {
+    if (CARNES_Y_DERIVADOS.some((carne) => textoCompleto.includes(carne))) {
+      return true;
+    }
+    
+    if (dieta === 'Vegano') {
+      const productosAnimales = ['huevo', 'leche', 'queso', 'yogur', 'nata', 'mantequilla', 'miel'];
+      if (productosAnimales.some((prod) => textoCompleto.includes(prod))) {
+        return true;
+      }
+    }
+    return false;
   }
-  if (dieta === 'Vegano') {
-    const noVegano = ['cerdo', 'pollo', 'carne', 'vacuno', 'pescado', 'marisco', 'huevo', 'leche', 'queso', 'yogur', 'nata', 'mantequilla', 'miel', 'jamon', 'bacon'];
-    return noVegano.some((ing) => textoCompleto.includes(ing));
-  }
+
   if (dieta === 'Halal') {
-    const noHalal = ['cerdo', 'jamon', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
+    const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'beicon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor', 'morcilla'];
     return noHalal.some((ing) => textoCompleto.includes(ing));
   }
+
   return false;
 }
 
