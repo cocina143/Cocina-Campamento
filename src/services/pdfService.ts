@@ -53,7 +53,19 @@ function esIncompatibleConDieta(dish: Dish, dieta: TipoDieta): boolean {
   const ingredientes = (dish.ingredients || []).map((ing) => ing.name.toLowerCase());
   const nombrePlato = dish.name.toLowerCase();
   const textoCompleto = [...ingredientes, nombrePlato].join(' ');
-
+  // Pescetariano: NO come carne, pero SÍ pescado/marisco
+  if (dieta === 'Pescetariano') {
+    const SOLO_CARNES = [
+      'cerdo', 'pollo', 'vacuno', 'ternera', 'cordero', 'buey', 'pavo', 'conejo', 'caballo', 'cabra',
+      'solomillo', 'chuletón', 'entrecot', 'costilla', 'lomo', 'paletilla', 'falda', 'aguja', 'pescuezo',
+      'jamon', 'jamón', 'serrano', 'ibérico', 'iberico', 'bacon', 'beicon', 'panceta', 'chorizo', 
+      'salchichon', 'salchichón', 'salchicha', 'mortadela', 'fuet', 'cecina', 'morcilla', 'sobrasada', 
+      'choped', 'paté', 'pate', 'pato', 'oca', 'codorniz', 'perdiz', 'faisán', 'faisan', 'venado', 
+      'jabali', 'jabalí', 'caldo de carne', 'caldo de pollo', 'extracto de carne',
+      'picada', 'picado', 'rehogado con carne', 'con carne',
+    ];
+    return SOLO_CARNES.some((carne) => textoCompleto.includes(carne));
+  }
   if (dieta === 'Vegetariano' || dieta === 'Vegano') {
     if (CARNES_Y_DERIVADOS.some((carne) => textoCompleto.includes(carne))) {
       return true;
