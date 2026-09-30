@@ -3,6 +3,7 @@ import type { Dish, Ingredient, AllergenId, DietId } from '@/data/dishes';
 import { ALLERGEN_OPTIONS, DIET_OPTIONS } from '@/data/dishes';
 import { searchFreeImage, getFallbackImage } from '@/services/imageService';
 import { Plus, Trash2, X, ChefHat, Search, Loader2, AlertTriangle, Leaf, Copy } from 'lucide-react';
+
 interface DishManagerModalProps {
   dishes: Dish[];
   onSaveDishes: (dishes: Dish[]) => void;
@@ -22,16 +23,18 @@ export function DishManagerModal({ dishes, onSaveDishes, onClose }: DishManagerM
   const handleDeleteDish = (id: string) => {
     setLocalDishes((prev) => prev.filter((d) => d.id !== id));
   };
+
   const handleCopyDish = (dish: Dish) => {
     const copia: Dish = {
       ...dish,
       id: Date.now().toString(),
       name: `${dish.name} (Copia)`,
-      diets: [], // Limpiamos las dietas para que el usuario las marque de nuevo
-      allergens: [], // Limpiamos alérgenos también para revisar
+      diets: [],
+      allergens: [],
     };
     setEditingDish(copia);
   };
+
   const handleNewDish = () => {
     setEditingDish({ id: Date.now().toString(), name: '', category: 'Plato principal', image: '', ingredients: [], allergens: [], diets: [] });
   };
@@ -95,15 +98,14 @@ export function DishManagerModal({ dishes, onSaveDishes, onClose }: DishManagerM
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
         <div className="flex items-center justify-between pb-4 border-b border-stone-200">
-                            <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => setEditingDish(dish)} className="text-xs bg-stone-100 font-semibold px-3 py-1.5 rounded-lg hover:bg-stone-200">Editar</button>
-                    <button type="button" onClick={() => handleCopyDish(dish)} className="text-xs bg-blue-100 text-blue-700 font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-200 flex items-center gap-1" title="Copiar receta">
-                      <Copy className="w-3.5 h-3.5" /> Copiar
-                    </button>
-                    <button type="button" onClick={() => handleDeleteDish(dish.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+          <div className="flex items-center gap-2">
+            <ChefHat className="w-6 h-6 text-orange-600" />
+            <h2 className="text-xl font-bold text-stone-900">Gestor de Platos y Recetas</h2>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-stone-100 rounded-full">
+            <X className="w-5 h-5 text-stone-500" />
+          </button>
+        </div>
 
         {editingDish ? (
           <div className="mt-6 space-y-4">
@@ -217,6 +219,9 @@ export function DishManagerModal({ dishes, onSaveDishes, onClose }: DishManagerM
                   </div>
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={() => setEditingDish(dish)} className="text-xs bg-stone-100 font-semibold px-3 py-1.5 rounded-lg hover:bg-stone-200">Editar</button>
+                    <button type="button" onClick={() => handleCopyDish(dish)} className="text-xs bg-blue-100 text-blue-700 font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-200 flex items-center gap-1" title="Copiar receta">
+                      <Copy className="w-3.5 h-3.5" /> Copiar
+                    </button>
                     <button type="button" onClick={() => handleDeleteDish(dish.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
                       <Trash2 className="w-4 h-4" />
                     </button>
