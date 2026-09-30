@@ -504,8 +504,11 @@ export default function App() {
   }, [allVisibleDishes, personasList]);
 
   // Resumen de raciones especiales del día
-  const allergySummary = useMemo(() => {
-    const personasConAlergias = personasList.filter((p) => p.alergias.length > 0);
+    const allergySummary = useMemo(() => {
+    // Incluir personas con alergias O con dieta especial
+    const personasConAlergiasODieta = personasList.filter(
+      (p) => p.alergias.length > 0 || (p.dieta && p.dieta !== 'General')
+    );
     const platosAfectados = new Set<string>();
     const detalles: { persona: string; alergias: string[]; platos: string[] }[] = [];
 
@@ -530,8 +533,8 @@ export default function App() {
       }
     });
 
-    return {
-      totalPersonas: personasConAlergias.length,
+        return {
+      totalPersonas: personasConAlergiasODieta.length,
       platosAfectados: Array.from(platosAfectados),
       detalles,
     };
