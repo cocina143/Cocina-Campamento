@@ -4,8 +4,7 @@ import type { SectionCounts, SectionId } from '@/data/sections';
 import { SECTIONS, effectiveMultiplier } from '@/data/sections';
 
 export type TipoDieta = 'General' | 'Vegetariano' | 'Pescetariano' | 'Vegano' | 'Halal';
-export const DIETA_OPTIONS: TipoDieta[] = ['General', 'Halal', 'Vegetariano', 'Vegano'];
-
+export const DIETA_OPTIONS: TipoDieta[] = ['General', 'Vegetariano', 'Pescetariano', 'Vegano', 'Halal'];
 export interface Persona {
   id: string;
   nombre: string;
