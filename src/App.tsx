@@ -28,7 +28,7 @@ import {
   Wifi, WifiOff, FileDown, ShoppingBag, Coffee, Sun, Apple, Moon, AlertTriangle 
 } from 'lucide-react';
 
-type FilterCategory = 'General' | 'Halal' | 'Vegetariano';
+type FilterCategory = 'General' | 'Halal' | 'Vegetariano' | 'Pescetariano';
 
 const STORAGE_KEY = 'cocina-campamento-counts';
 const DATE_KEY = 'cocina-campamento-date';
@@ -669,7 +669,7 @@ export default function App() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {(['General', 'Halal', 'Vegetariano'] as FilterCategory[]).map((cat) => (
+              {(['General', 'Halal', 'Veget{(['General', 'Halal', 'Vegetariano', 'Pescetariano'] as FilterCategory[]).map((cat) => (ariano'] as FilterCategory[]).map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setFilter(cat)}
