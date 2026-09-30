@@ -3,7 +3,7 @@ import type { Dish } from '@/data/dishes';
 import type { SectionCounts, SectionId } from '@/data/sections';
 import { SECTIONS, effectiveMultiplier } from '@/data/sections';
 
-export type TipoDieta = 'General' | 'Halal' | 'Vegetariano' | 'Vegano';
+export type TipoDieta = 'General' | 'Vegetariano' | 'Pescetariano' | 'Vegano' | 'Halal';
 export const DIETA_OPTIONS: TipoDieta[] = ['General', 'Halal', 'Vegetariano', 'Vegano'];
 
 export interface Persona {
@@ -100,7 +100,19 @@ export function esIncompatibleConDieta(dish: Dish, dieta: TipoDieta): boolean {
   const ingredientes = (dish.ingredients || []).map((ing) => ing.name.toLowerCase());
   const nombrePlato = dish.name.toLowerCase();
   const textoCompleto = [...ingredientes, nombrePlato].join(' ');
-
+  // Pescetariano: NO come carne, pero SÍ pescado/marisco
+  if (dieta === 'Pescetariano') {
+    const SOLO_CARNES = [
+      'cerdo', 'pollo', 'vacuno', 'ternera', 'cordero', 'buey', 'pavo', 'conejo', 'caballo', 'cabra',
+      'solomillo', 'chuletón', 'entrecot', 'costilla', 'lomo', 'paletilla', 'falda', 'aguja', 'pescuezo',
+      'jamon', 'jamón', 'serrano', 'ibérico', 'iberico', 'bacon', 'beicon', 'panceta', 'chorizo', 
+      'salchichon', 'salchichón', 'salchicha', 'mortadela', 'fuet', 'cecina', 'morcilla', 'sobrasada', 
+      'choped', 'paté', 'pate', 'pato', 'oca', 'codorniz', 'perdiz', 'faisán', 'faisan', 'venado', 
+      'jabali', 'jabalí', 'caldo de carne', 'caldo de pollo', 'extracto de carne',
+      'picada', 'picado', 'rehogado con carne', 'con carne',
+    ];
+    return SOLO_CARNES.some((carne) => textoCompleto.includes(carne));
+  }
   if (dieta === 'Vegetariano' || dieta === 'Vegano') {
     // Detectar cualquier carne o derivado
     if (CARNES_Y_DERIVADOS.some((carne) => textoCompleto.includes(carne))) {
@@ -165,7 +177,9 @@ export function detectAllergenConflicts(dish: Dish, personas: Persona[]) {
       if (esIncompatibleConDieta(dish, persona.dieta)) {
         tipoConflicto = 'dieta';
         // Añadir un mensaje descriptivo según la dieta
-        if (persona.dieta === 'Vegetariano' && !alergiasCoincidentes.some(a => a.toLowerCase().includes('carne'))) {
+                if (persona.dieta === 'Pescetariano' && !alergiasCoincidentes.some(a => a.toLowerCase().includes('carne'))) {
+          alergiasCoincidentes.push(`No apto para ${persona.dieta} (contiene carne)`);
+        } else if (persona.dieta === 'Vegetariano' && !alergiasCoincidentes.some(a => a.toLowerCase().includes('carne'))) {
           alergiasCoincidentes.push(`No apto para ${persona.dieta} (contiene carne/pescado)`);
         } else if (persona.dieta === 'Vegano') {
           if (!alergiasCoincidentes.some(a => a.toLowerCase().includes('vegano') || a.toLowerCase().includes('carne') || a.toLowerCase().includes('animal'))) {
