@@ -138,29 +138,56 @@ export function getPersonasQueNoPuedenComer(dish: Dish, counts: SectionCounts, p
   });
   return total;
 }
+// Detecta conflictos de alergias Y de dieta para un plato
 export function detectAllergenConflicts(dish: Dish, personas: Persona[]) {
-  const conflicts: { persona: Persona; alergiasCoincidentes: string[] }[] = [];
-  const ingredientesNormalizados = (dish.ingredients || []).map((ing) => normalizar(ing.name));
+  const conflictos: { persona: Persona; alergiasCoincidentes: string[]; tipo: 'alergia' | 'dieta' }[] = [];
+  
+  const ingredientes = (dish.ingredients || []).map((ing) => ing.name.toLowerCase());
+  const nombrePlato = dish.name.toLowerCase();
+  const textoCompleto = [...ingredientes, nombrePlato].join(' ');
 
   personas.forEach((persona) => {
-    const coincidencias: string[] = [];
-    persona.alergias.forEach((alergia) => {
-      const alergiaNorm = normalizar(alergia);
-      let detectada = false;
-      for (const ingNorm of ingredientesNormalizados) {
-        if (ingNorm.includes(alergiaNorm) || alergiaNorm.includes(ingNorm)) { coincidencias.push(alergia); detectada = true; break; }
-      }
-      if (!detectada && dish.allergens && dish.allergens.length > 0) {
-        for (const alergenoPlato of dish.allergens) {
-          const sinonimos = SINONIMOS[alergenoPlato] || [];
-          if (sinonimos.some((s) => normalizar(s).includes(alergiaNorm) || alergiaNorm.includes(normalizar(s)))) {
-            coincidencias.push(`${alergia} (por ${alergenoPlato})`); detectada = true; break;
+    const alergiasCoincidentes: string[] = [];
+    let tipoConflicto: 'alergia' | 'dieta' = 'alergia';
+
+    // 1. Detectar alergias explícitas
+    if (persona.alergias && persona.alergias.length > 0) {
+      persona.alergias.forEach((alergia) => {
+        const alergiaLower = alergia.toLowerCase().trim();
+        if (alergiaLower && textoCompleto.includes(alergiaLower)) {
+          alergiasCoincidentes.push(alergia);
+        }
+      });
+    }
+
+    // 2. Detectar incompatibilidad por dieta
+    if (persona.dieta && persona.dieta !== 'General') {
+      if (esIncompatibleConDieta(dish, persona.dieta)) {
+        tipoConflicto = 'dieta';
+        // Añadir un mensaje descriptivo según la dieta
+        if (persona.dieta === 'Vegetariano' && !alergiasCoincidentes.some(a => a.toLowerCase().includes('carne'))) {
+          alergiasCoincidentes.push(`No apto para ${persona.dieta} (contiene carne/pescado)`);
+        } else if (persona.dieta === 'Vegano') {
+          if (!alergiasCoincidentes.some(a => a.toLowerCase().includes('vegano') || a.toLowerCase().includes('carne') || a.toLowerCase().includes('animal'))) {
+            alergiasCoincidentes.push(`No apto para ${persona.dieta} (contiene productos animales)`);
           }
-          if (normalizar(alergenoPlato) === alergiaNorm) { coincidencias.push(alergia); detectada = true; break; }
+        } else if (persona.dieta === 'Halal') {
+          if (!alergiasCoincidentes.some(a => a.toLowerCase().includes('halal') || a.toLowerCase().includes('cerdo') || a.toLowerCase().includes('alcohol'))) {
+            alergiasCoincidentes.push(`No apto para ${persona.dieta}`);
+          }
         }
       }
-    });
-    if (coincidencias.length > 0) { conflicts.push({ persona, alergiasCoincidentes: coincidencias }); }
+    }
+
+    // Si hay algún conflicto, añadirlo
+    if (alergiasCoincidentes.length > 0) {
+      conflictos.push({
+        persona,
+        alergiasCoincidentes,
+        tipo: tipoConflicto,
+      });
+    }
   });
-  return conflicts;
+
+  return conflictos;
 }
