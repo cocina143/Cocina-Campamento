@@ -12,8 +12,10 @@ export const ALLERGEN_OPTIONS = [
 ] as const;
 
 export const DIET_OPTIONS = [
-  { id: 'vegetariano', label: 'Vegetariano', icon: '🥬' },
-  { id: 'vegano', label: 'Vegano', icon: '🌱' },
+  { id: 'vegetariano', label: 'Vegetariano', icon: '🌱' },
+  { id: 'pescetariano', label: 'Pescetariano', icon: '🐟' },
+  { id: 'halal', label: 'Halal', icon: '☪️' },
+  { id: 'vegano', label: 'Vegano', icon: '🌿' },
 ] as const;
 
 export type AllergenId = typeof ALLERGEN_OPTIONS[number]['id'];
