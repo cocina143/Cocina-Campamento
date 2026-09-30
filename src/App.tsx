@@ -467,7 +467,9 @@ export default function App() {
       const dishIds = currentDayMenu[key] || [];
       const dishes = dishesList.filter((dish) => {
         const isPlanned = dishIds.includes(dish.id) || dishIds.includes(dish.name);
-        const matchesCategory = filter === 'General' || (filter === 'Vegetariano' && (dish.diets?.includes('vegetariano') || dish.diets?.includes('vegano'))) || (filter === 'Halal' && !dish.ingredients?.some((ing) => /cerdo|jamón|jamon|bacon|alcohol|vino|cerveza/i.test(ing.name)));            
+        const matchesCategory = filter === 'General' || 
+  (filter === 'Vegetariano' && (dish.diets?.includes('vegetariano') || dish.diets?.includes('vegano'))) || 
+  (filter === 'Halal' && !dish.ingredients?.some((ing) => /cerdo|jamón|jamon|bacon|beicon|alcohol|vino|cerveza|mor cilla|morcilla/i.test(ing.name)));
         return isPlanned && matchesCategory;
       });
       return { key, label, icon, dishes };
