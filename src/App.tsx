@@ -734,9 +734,9 @@ export default function App() {
                 </p>
                 {allergySummary.detalles.length > 0 && (
                   <div className="mt-2 space-y-1">
-                    {allergySummary.detalles.map((detalle, idx) => (
+                                       {allergySummary.detalles.map((detalle, idx) => (
                       <p key={idx} className="text-xs text-red-700">
-                        <strong>{detalle.persona}</strong> ({detalle.alergias.join(', ')}) → necesita ración sin alérgenos en: {detalle.platos.join(', ')}
+                        <strong>{detalle.persona}</strong> ({detalle.alergias.join(', ')}) → necesita ración especial en: {detalle.platos.join(', ')}
                       </p>
                     ))}
                   </div>
