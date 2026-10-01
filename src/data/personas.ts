@@ -21,7 +21,7 @@ export async function getPersonasFromSupabase(): Promise<Persona[]> {
     id: p.id,
     nombre: p.nombre,
     alergias: Array.isArray(p.alergias) ? p.alergias : [],
-    dieta: (['General', 'Halal', 'Vegetariano', 'Vegano'].includes(p.dieta) ? p.dieta : 'General') as TipoDieta,
+    dieta: (['General', 'Halal', 'Vegetariano', 'Vegano', 'Pescetariano', 'Sin Gluten'].includes(p.dieta) ? p.dieta : 'General') as TipoDieta,
     seccion: (SECTIONS.some(s => s.id === p.seccion) ? p.seccion : '') as SectionId | '',
     notas: p.notas || '',
   }));
