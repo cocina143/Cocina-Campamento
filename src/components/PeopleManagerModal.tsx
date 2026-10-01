@@ -54,12 +54,16 @@ export function PeopleManagerModal({ personas, onSavePersonas, onClose }: People
 
   const handleSave = () => { onSavePersonas(localPersonas); onClose(); };
 
-    const dietaColor = (dieta: TipoDieta) => {
+      const dietaColor = (dieta: TipoDieta) => {
     switch (dieta) {
       case 'Halal': return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'Vegetariano': return 'bg-green-100 text-green-800 border-green-300';
       case 'Pescetariano': return 'bg-cyan-100 text-cyan-800 border-cyan-300';
       case 'Vegano': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+      case 'Sin Gluten': return 'bg-amber-100 text-amber-800 border-amber-300';
+      default: return 'bg-stone-100 text-stone-700 border-stone-300';
+    }
+  };
       default: return 'bg-stone-100 text-stone-700 border-stone-300';
     }
   };
