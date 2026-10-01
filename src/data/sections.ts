@@ -74,7 +74,7 @@ export const SECTIONS: Section[] = [
   },
 ];
 
-export const CHILD_REDUCTION = 0.3;
+export const CHILD_REDUCTION = 0.2;
 
 export type SectionCounts = Record<SectionId, number>;
 
