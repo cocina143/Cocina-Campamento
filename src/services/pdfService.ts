@@ -53,6 +53,17 @@ function esIncompatibleConDieta(dish: Dish, dieta: TipoDieta): boolean {
   const ingredientes = (dish.ingredients || []).map((ing) => ing.name.toLowerCase());
   const nombrePlato = dish.name.toLowerCase();
   const textoCompleto = [...ingredientes, nombrePlato].join(' ');
+    // Sin Gluten: NO puede comer trigo, cebada, centeno, avena ni derivados
+  if (dieta === 'Sin Gluten') {
+    const CON_GLUTEN = [
+      'gluten', 'trigo', 'centeno', 'cebada', 'avena', 'espelta', 'kamut', 'triticale',
+      'harina', 'pan', 'pasta', 'macarrones', 'espagueti', 'fideos', 'cuscus', 'cuscús', 'semolina',
+      'rebozado', 'empanado', 'croqueta', 'nugget', 'galleta', 'bollicao', 'brioche', 'tostada',
+      'soja texturizada', 'salsa de soja',
+    ];
+    return CON_GLUTEN.some((ing) => textoCompleto.includes(ing));
+  }
+
   // Pescetariano: NO come carne, pero SÍ pescado/marisco
   if (dieta === 'Pescetariano') {
     const SOLO_CARNES = [
