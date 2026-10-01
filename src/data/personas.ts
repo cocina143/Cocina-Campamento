@@ -3,8 +3,8 @@ import type { Dish } from '@/data/dishes';
 import type { SectionCounts, SectionId } from '@/data/sections';
 import { SECTIONS, effectiveMultiplier } from '@/data/sections';
 
-export type TipoDieta = 'General' | 'Vegetariano' | 'Pescetariano' | 'Vegano' | 'Halal';
-export const DIETA_OPTIONS: TipoDieta[] = ['General', 'Vegetariano', 'Pescetariano', 'Vegano', 'Halal'];
+export type TipoDieta = 'General' | 'Vegetariano' | 'Pescetariano' | 'Vegano' | 'Halal' | 'Sin Gluten';
+export const DIETA_OPTIONS: TipoDieta[] = ['General', 'Vegetariano', 'Pescetariano', 'Vegano', 'Halal', 'Sin Gluten'];
 export interface Persona {
   id: string;
   nombre: string;
@@ -99,6 +99,17 @@ export function esIncompatibleConDieta(dish: Dish, dieta: TipoDieta): boolean {
   const ingredientes = (dish.ingredients || []).map((ing) => ing.name.toLowerCase());
   const nombrePlato = dish.name.toLowerCase();
   const textoCompleto = [...ingredientes, nombrePlato].join(' ');
+    // Sin Gluten: NO puede comer trigo, cebada, centeno, avena ni derivados
+  if (dieta === 'Sin Gluten') {
+    const CON_GLUTEN = [
+      'gluten', 'trigo', 'centeno', 'cebada', 'avena', 'espelta', 'kamut', 'triticale',
+      'harina', 'pan', 'pasta', 'macarrones', 'espagueti', 'fideos', 'cuscus', 'cuscús', 'semolina',
+      'rebozado', 'empanado', 'croqueta', 'nugget', 'galleta', 'bollicao', 'brioche', 'tostada',
+      'soja texturizada', 'salsa de soja',
+    ];
+    return CON_GLUTEN.some((ing) => textoCompleto.includes(ing));
+  }
+
   // Pescetariano: NO come carne, pero SÍ pescado/marisco
   if (dieta === 'Pescetariano') {
     const SOLO_CARNES = [
@@ -254,9 +265,13 @@ export function detectAllergenConflicts(dish: Dish, personas: Persona[]) {
           if (!alergiasCoincidentes.some(a => a.toLowerCase().includes('vegano') || a.toLowerCase().includes('carne') || a.toLowerCase().includes('animal'))) {
             alergiasCoincidentes.push(`No apto para ${persona.dieta} (contiene productos animales)`);
           }
-        } else if (persona.dieta === 'Halal') {
+               } else if (persona.dieta === 'Halal') {
           if (!alergiasCoincidentes.some(a => a.toLowerCase().includes('halal') || a.toLowerCase().includes('cerdo') || a.toLowerCase().includes('alcohol'))) {
             alergiasCoincidentes.push(`No apto para ${persona.dieta}`);
+          }
+        } else if (persona.dieta === 'Sin Gluten') {
+          if (!alergiasCoincidentes.some(a => a.toLowerCase().includes('gluten'))) {
+            alergiasCoincidentes.push(`No apto para ${persona.dieta} (contiene gluten)`);
           }
         }
       }
