@@ -3,7 +3,7 @@ import type { Dish } from '@/data/dishes';
 import type { SectionCounts } from '@/data/sections';
 import { SECTIONS, effectiveMultiplier } from '@/data/sections';
 import type { Persona, TipoDieta } from '@/data/personas';
-import { getDesglosePorSeccionParaDieta, getTotalPersonasConDieta, esIncompatibleConDieta } from '@/data/personas';
+import { getDesglosePorSeccionParaDieta, getTotalPersonasConDieta, esIncompatibleConDieta, esIncompatibleConAlergenos } from '@/data/personas';
 
 interface DishModalProps {
   dish: Dish;
@@ -43,7 +43,7 @@ function formatAmount(amount: number, unit: string): { value: string; unit: stri
 function getDietaDelPlato(dish: Dish): TipoDieta | null {
   if (dish.diets?.includes('vegano')) return 'Vegano';
   if (dish.diets?.includes('vegetariano')) return 'Vegetariano';
-  // Detectar Halal por ingredientes
+  
   const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
   const tieneNoHalal = dish.ingredients?.some((ing) =>
     noHalal.some((nh) => ing.name.toLowerCase().includes(nh))
@@ -62,21 +62,28 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
   let totalEfectivo: number;
   let tituloDieta: string;
 
-    if (dietaDelPlato) {
+  if (dietaDelPlato) {
     // Plato con dieta específica: calcular solo para personas con esa dieta
     desglose = getDesglosePorSeccionParaDieta(counts, personas, dietaDelPlato);
     totalEfectivo = getTotalPersonasConDieta(counts, personas, dietaDelPlato);
     tituloDieta = `${dietaDelPlato.toUpperCase()} (${totalEfectivo.toFixed(1)} raciones)`;
-    } else {
-    // Plato General: calcular para todos MENOS los que no pueden comerlo
+  } else {
+    // Plato General: calcular para todos MENOS los que no pueden comerlo (por dieta O por alergia)
     desglose = SECTIONS.map((s) => {
       const totalSeccion = counts[s.id] || 0;
       const personasDeSeccion = personas.filter((p) => p.seccion === s.id);
       let personasQuePueden = totalSeccion;
       
-      // Restar personas cuya dieta sea incompatible con este plato
+      // 1. Restar personas cuya dieta sea incompatible con este plato
       personasDeSeccion.forEach((p) => {
         if (p.dieta !== 'General' && esIncompatibleConDieta(dish, p.dieta)) {
+          personasQuePueden--;
+        }
+      });
+      
+      // 2. NUEVO: Restar personas con alergias incompatibles con los alérgenos del plato
+      personasDeSeccion.forEach((p) => {
+        if (esIncompatibleConAlergenos(dish, p)) {
           personasQuePueden--;
         }
       });
@@ -85,11 +92,12 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
       return {
         sectionId: s.id,
         sectionName: s.shortName,
-        count: personasQuePueden,
+        count: Math.max(0, personasQuePueden), // Asegurar que nunca sea negativo
         multiplier,
-        effectiveCount: personasQuePueden * multiplier,
+        effectiveCount: Math.max(0, personasQuePueden) * multiplier,
       };
     }).filter((item) => item.count > 0);
+    
     totalEfectivo = desglose.reduce((acc, item) => acc + item.effectiveCount, 0);
     tituloDieta = `GENERAL (${totalEfectivo.toFixed(1)} raciones)`;
   }
@@ -124,7 +132,7 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
 
             {totalEfectivo === 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-xs text-amber-800">
-                ⚠️ No hay personas con dieta <strong>{dietaDelPlato}</strong> asignadas a ninguna sección. Las cantidades serán 0.
+                ⚠️ No hay personas que puedan comer este plato (por dieta o alergias). Las cantidades serán 0.
               </div>
             )}
 
