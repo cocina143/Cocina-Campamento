@@ -149,6 +149,35 @@ export function getPersonasQueNoPuedenComer(dish: Dish, counts: SectionCounts, p
   });
   return total;
 }
+// Verifica si un plato es incompatible con las alergias de una persona (para cálculo de cantidades)
+export function esIncompatibleConAlergenos(dish: Dish, persona: Persona): boolean {
+  const alergenosDelPlato = dish.allergens || [];
+  const alergiasDeLaPersona = persona.alergias || [];
+  
+  if (alergenosDelPlato.length === 0 || alergiasDeLaPersona.length === 0) {
+    return false;
+  }
+  
+  // Para cada alérgeno del plato, verificar si coincide con alguna alergia de la persona
+  for (const alergenoId of alergenosDelPlato) {
+    const palabrasAsociadas = ALERGENO_A_PALABRAS[alergenoId] || [alergenoId];
+    
+    for (const alergiaPersona of alergiasDeLaPersona) {
+      const alergiaLower = alergiaPersona.toLowerCase().trim();
+      
+      // Si la alergia de la persona coincide con alguna palabra asociada al alérgeno
+      const coincide = palabrasAsociadas.some((palabra) => 
+        alergiaLower.includes(palabra) || palabra.includes(alergiaLower)
+      );
+      
+      if (coincide) {
+        return true; // Es incompatible, no debe comerlo
+      }
+    }
+  }
+  
+  return false; // No hay incompatibilidad
+}
 // Detecta conflictos de alergias Y de dieta para un plato
 // ─── Mapeo de alérgenos oficiales a posibles nombres ─────────
 const ALERGENO_A_PALABRAS: Record<string, string[]> = {
