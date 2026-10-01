@@ -505,19 +505,22 @@ export default function App() {
   }, [allVisibleDishes, personasList]);
 
   // Resumen de raciones especiales del día
-    const allergySummary = useMemo(() => {
-    // Incluir personas con alergias O con dieta especial
+      const allergySummary = useMemo(() => {
     const personasConAlergiasODieta = personasList.filter(
       (p) => p.alergias.length > 0 || (p.dieta && p.dieta !== 'General')
     );
     const platosAfectados = new Set<string>();
-    const detalles: { persona: string; alergias: string[]; platos: string[] }[] = [];
+    const detalles: { persona: string; seccion: string; alergias: string[]; platos: string[] }[] = [];
 
     allVisibleDishes.forEach((dish) => {
       const conflicts = detectAllergenConflicts(dish, personasList);
       if (conflicts.length > 0) {
         platosAfectados.add(dish.name);
         conflicts.forEach((c) => {
+          const seccionNombre = c.persona.seccion 
+            ? SECTIONS.find(s => s.id === c.persona.seccion)?.shortName || c.persona.seccion 
+            : 'Sin sección';
+          
           const existing = detalles.find((d) => d.persona === c.persona.nombre);
           if (existing) {
             if (!existing.platos.includes(dish.name)) {
@@ -526,6 +529,7 @@ export default function App() {
           } else {
             detalles.push({
               persona: c.persona.nombre,
+              seccion: seccionNombre,
               alergias: c.alergiasCoincidentes,
               platos: [dish.name],
             });
@@ -534,13 +538,12 @@ export default function App() {
       }
     });
 
-        return {
+    return {
       totalPersonas: personasConAlergiasODieta.length,
       platosAfectados: Array.from(platosAfectados),
       detalles,
     };
   }, [allVisibleDishes, personasList]);
-
   const total = totalPeople(counts);
   const activeSectionCount = SECTIONS.filter((s) => counts[s.id] > 0).length;
 
@@ -733,13 +736,29 @@ export default function App() {
                     ? `⚠️ Hoy hay que preparar raciones especiales para ${allergySummary.detalles.length} ${allergySummary.detalles.length === 1 ? 'persona' : 'personas'}`
                     : '✅ Sin conflictos de alergias en el menú de hoy'}
                 </p>
-                {allergySummary.detalles.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                                       {allergySummary.detalles.map((detalle, idx) => (
-                      <p key={idx} className="text-xs text-red-700">
-                        <strong>{detalle.persona}</strong> ({detalle.alergias.join(', ')}) → necesita ración especial en: {detalle.platos.join(', ')}
-                      </p>
-                    ))}
+                                {allergySummary.detalles.length > 0 && (
+                  <div className="mt-2 space-y-2">
+                    {(() => {
+                      // Agrupar por sección
+                      const porSeccion: Record<string, typeof allergySummary.detalles> = {};
+                      allergySummary.detalles.forEach((detalle) => {
+                        if (!porSeccion[detalle.seccion]) {
+                          porSeccion[detalle.seccion] = [];
+                        }
+                        porSeccion[detalle.seccion].push(detalle);
+                      });
+                      
+                      return Object.entries(porSeccion).map(([seccion, detallesSeccion]) => (
+                        <div key={seccion} className="border-l-2 border-red-300 pl-2">
+                          <p className="text-xs font-bold text-red-800 mb-1">{seccion}:</p>
+                          {detallesSeccion.map((detalle, idx) => (
+                            <p key={idx} className="text-xs text-red-700 ml-2">
+                              • <strong>{detalle.persona}</strong> ({detalle.alergias.join(', ')}) → necesita ración especial en: {detalle.platos.join(', ')}
+                            </p>
+                          ))}
+                        </div>
+                      ));
+                    })()}
                   </div>
                 )}
               </div>
