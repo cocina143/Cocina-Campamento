@@ -811,18 +811,37 @@ export default function App() {
                           personas={personasList}
                         />
                         {/* Alerta de alergias si hay conflictos */}
-                                               {conflicts && conflicts.length > 0 && (
+                            {conflicts && conflicts.length > 0 && (
                           <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
                             <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
-                            <div className="text-xs text-red-800">
-                              <p className="font-bold mb-1">⚠️ Requiere ración especial:</p>
-                              {conflicts.map((c, idx) => (
-                                <p key={idx}>
-                                  <strong>{c.persona.nombre}</strong> 
-                                  {c.tipo === 'dieta' ? ` (dieta ${c.persona.dieta})` : ''} 
-                                  — no puede tomar: {c.alergiasCoincidentes.join(', ')}
-                                </p>
-                              ))}
+                            <div className="text-xs text-red-800 flex-1">
+                              <p className="font-bold mb-2">⚠️ Requiere ración especial:</p>
+                              {(() => {
+                                // Agrupar conflictos por sección
+                                const porSeccion: Record<string, typeof conflicts> = {};
+                                conflicts.forEach((c) => {
+                                  const seccionNombre = c.persona.seccion 
+                                    ? SECTIONS.find(s => s.id === c.persona.seccion)?.shortName || c.persona.seccion 
+                                    : 'Sin sección';
+                                  if (!porSeccion[seccionNombre]) {
+                                    porSeccion[seccionNombre] = [];
+                                  }
+                                  porSeccion[seccionNombre].push(c);
+                                });
+                                
+                                return Object.entries(porSeccion).map(([seccion, conflictosSeccion]) => (
+                                  <div key={seccion} className="mb-2 last:mb-0">
+                                    <p className="font-bold text-red-900 mb-1 border-b border-red-200 pb-0.5">{seccion}:</p>
+                                    {conflictosSeccion.map((c, idx) => (
+                                      <p key={idx} className="ml-2 mb-0.5">
+                                        • <strong>{c.persona.nombre}</strong> 
+                                        {c.tipo === 'dieta' ? ` (dieta ${c.persona.dieta})` : ''} 
+                                        — no puede tomar: {c.alergiasCoincidentes.join(', ')}
+                                      </p>
+                                    ))}
+                                  </div>
+                                ));
+                              })()}
                             </div>
                           </div>
                         )}
