@@ -150,18 +150,40 @@ export function getPersonasQueNoPuedenComer(dish: Dish, counts: SectionCounts, p
   return total;
 }
 // Detecta conflictos de alergias Y de dieta para un plato
+// ─── Mapeo de alérgenos oficiales a posibles nombres ─────────
+const ALERGENO_A_PALABRAS: Record<string, string[]> = {
+  'gluten': ['gluten', 'trigo', 'centeno', 'cebada', 'avena', 'espelta', 'harina', 'pan', 'pasta', 'cuscus', 'cuscús', 'semolina', 'rebozado', 'empanado'],
+  'crustaceos': ['crustaceos', 'crustáceos', 'gamba', 'langostino', 'cangrejo', 'langosta', 'camarón', 'camaron'],
+  'huevos': ['huevo', 'huevos', 'clara', 'yema', 'ovoproducto', 'mayonesa', 'merengue', 'empanado'],
+  'pescado': ['pescado', 'bacalao', 'merluza', 'atun', 'atún', 'salmon', 'salmón', 'sardina', 'boqueron', 'boquerón'],
+  'cacahuetes': ['cacahuetes', 'cacahuete', 'mani', 'maní'],
+  'soja': ['soja', 'soya', 'tofu', 'tempeh'],
+  'lacteos': ['lacteos', 'lácteos', 'lactosa', 'leche', 'queso', 'yogur', 'yogurt', 'nata', 'crema', 'mantequilla', 'requeson', 'requesón'],
+  'frutos_secos': ['frutos secos', 'frutos de cáscara', 'almendra', 'nuez', 'avellana', 'pistacho', 'anacardo', 'cajú', 'caju', 'macadamia'],
+  'apio': ['apio'],
+  'mostaza': ['mostaza'],
+  'sesamo': ['sesamo', 'sésamo', 'ajonjoli', 'ajonjolí'],
+  'sulfitos': ['sulfitos', 'sulfatos', 'dioxido de azufre', 'dióxido de azufre'],
+  'altramuces': ['altramuces', 'altramuz', 'lupino'],
+  'moluscos': ['moluscos', 'mejillon', 'mejillón', 'almeja', 'calamar', 'pulpo', 'sepia'],
+};
+
+// Detecta conflictos de alergias Y de dieta para un plato
 export function detectAllergenConflicts(dish: Dish, personas: Persona[]) {
   const conflictos: { persona: Persona; alergiasCoincidentes: string[]; tipo: 'alergia' | 'dieta' }[] = [];
   
   const ingredientes = (dish.ingredients || []).map((ing) => ing.name.toLowerCase());
   const nombrePlato = dish.name.toLowerCase();
   const textoCompleto = [...ingredientes, nombrePlato].join(' ');
+  
+  // Lista de alérgenos marcados manualmente en el plato
+  const alergenosDelPlato = dish.allergens || [];
 
   personas.forEach((persona) => {
     const alergiasCoincidentes: string[] = [];
     let tipoConflicto: 'alergia' | 'dieta' = 'alergia';
 
-    // 1. Detectar alergias explícitas
+    // 1. Detectar alergias explícitas (por texto en ingredientes)
     if (persona.alergias && persona.alergias.length > 0) {
       persona.alergias.forEach((alergia) => {
         const alergiaLower = alergia.toLowerCase().trim();
@@ -171,12 +193,31 @@ export function detectAllergenConflicts(dish: Dish, personas: Persona[]) {
       });
     }
 
-    // 2. Detectar incompatibilidad por dieta
+    // 2. NUEVO: Detectar alérgenos marcados manualmente en el plato
+    if (alergenosDelPlato.length > 0 && persona.alergias && persona.alergias.length > 0) {
+      alergenosDelPlato.forEach((alergenoId) => {
+        const palabrasAsociadas = ALERGENO_A_PALABRAS[alergenoId] || [alergenoId];
+        
+        persona.alergias.forEach((alergiaPersona) => {
+          const alergiaLower = alergiaPersona.toLowerCase().trim();
+          
+          // Si la alergia de la persona coincide con alguna palabra asociada al alérgeno
+          const coincide = palabrasAsociadas.some((palabra) => 
+            alergiaLower.includes(palabra) || palabra.includes(alergiaLower)
+          );
+          
+          if (coincide && !alergiasCoincidentes.includes(alergiaPersona)) {
+            alergiasCoincidentes.push(alergiaPersona);
+          }
+        });
+      });
+    }
+
+    // 3. Detectar incompatibilidad por dieta
     if (persona.dieta && persona.dieta !== 'General') {
       if (esIncompatibleConDieta(dish, persona.dieta)) {
         tipoConflicto = 'dieta';
-        // Añadir un mensaje descriptivo según la dieta
-                if (persona.dieta === 'Pescetariano' && !alergiasCoincidentes.some(a => a.toLowerCase().includes('carne'))) {
+        if (persona.dieta === 'Pescetariano' && !alergiasCoincidentes.some(a => a.toLowerCase().includes('carne'))) {
           alergiasCoincidentes.push(`No apto para ${persona.dieta} (contiene carne)`);
         } else if (persona.dieta === 'Vegetariano' && !alergiasCoincidentes.some(a => a.toLowerCase().includes('carne'))) {
           alergiasCoincidentes.push(`No apto para ${persona.dieta} (contiene carne/pescado)`);
