@@ -41,8 +41,21 @@ function formatAmount(amount: number, unit: string): { value: string; unit: stri
 
 // Determina qué dieta aplica a este plato
 function getDietaDelPlato(dish: Dish): TipoDieta | null {
+    // Orden de prioridad: la más restrictiva primero
   if (dish.diets?.includes('vegano')) return 'Vegano';
   if (dish.diets?.includes('vegetariano')) return 'Vegetariano';
+  if (dish.diets?.includes('pescetariano')) return 'Pescetariano';
+  
+  // Detectar Halal por etiqueta o por ingredientes
+  const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
+  const tieneNoHalal = dish.ingredients?.some((ing) =>
+    noHalal.some((nh) => ing.name.toLowerCase().includes(nh))
+  );
+  if (dish.diets?.includes('halal' as any) || (!tieneNoHalal && dish.name.toLowerCase().includes('halal'))) {
+    return 'Halal';
+  }
+  return null;
+}
   
   const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
   const tieneNoHalal = dish.ingredients?.some((ing) =>
