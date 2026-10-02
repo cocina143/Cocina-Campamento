@@ -273,13 +273,7 @@ export function generateCompraPorProveedorPDF(
   counts: SectionCounts,
   personas: Persona[],
   proveedores: Proveedor[],
-  campamentos: Campamento[] = [], // <-- AÑADIDO
-  campName: string = 'Cocina La Milagrosa 143'
-): void {
-  allDishes: Dish[],
-  counts: SectionCounts,
-  personas: Persona[],
-  proveedores: Proveedor[],
+  campamentos: Campamento[] = [],
   campName: string = 'Cocina La Milagrosa 143'
 ): void {
   const doc = new jsPDF();
