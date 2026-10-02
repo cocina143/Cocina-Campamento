@@ -639,14 +639,7 @@ export default function App() {
                 <FileDown className="w-3.5 h-3.5" />
                 <span>PDF Día</span>
               </button>
-                                           {/* Botón PDF por Proveedor */}
-              <button
-                onClick={() => {
-                  const currentDayMenu = menuList.find((m) => m.day === selectedCampDay);
-                  if (currentDayMenu) {
-                    generateCompraPorProveedorPDF(currentDayMenu, dishesList, counts, personasList, proveedoresList, campamentosList);
-                  }
-                }}
+                                          
                               {/* Botón PDF por Proveedor */}
               <button
                 onClick={() => {
