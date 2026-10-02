@@ -647,15 +647,16 @@ export default function App() {
                     generateCompraPorProveedorPDF(currentDayMenu, dishesList, counts, personasList, proveedoresList, campamentosList);
                   }
                 }}
+                              {/* Botón PDF por Proveedor */}
+              <button
+                onClick={() => {
+                  const currentDayMenu = menuList.find((m) => m.day === selectedCampDay);
+                  if (currentDayMenu) {
+                    generateCompraPorProveedorPDF(currentDayMenu, dishesList, counts, personasList, proveedoresList, campamentosList);
+                  }
+                }}
                 className="flex items-center justify-center gap-1.5 bg-indigo-600 text-white rounded-xl px-3 py-2 text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm flex-1 sm:flex-initial"
               >
-                <Package className="w-3.5 h-3.5" />
-                <span>PDF Proveedores</span>
-              </button>
-              >
-                <Package className="w-3.5 h-3.5" />
-                <span>PDF Proveedores</span>
-              </button>
                 <Package className="w-3.5 h-3.5" />
                 <span>PDF Proveedores</span>
               </button>
