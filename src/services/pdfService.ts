@@ -15,15 +15,12 @@ interface ConsolidatedItem {
   unit: string;
 }
 
-// ─── LÓGICA DE DIETAS (Unificada y robusta) ───
 function getDietasCompatiblesDelPlato(dish: Dish): TipoDieta[] {
   const dietas: TipoDieta[] = [];
   const dietsLower = (dish.diets || []).map(d => String(d).toLowerCase().trim());
-  
   if (dietsLower.includes('vegano')) dietas.push('Vegano');
   if (dietsLower.includes('vegetariano')) dietas.push('Vegetariano');
   if (dietsLower.includes('pescetariano')) dietas.push('Pescetariano');
-  
   const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
   const tieneNoHalal = dish.ingredients?.some((ing) => noHalal.some((nh) => ing.name.toLowerCase().includes(nh)));
   if (dietsLower.includes('halal') || (!tieneNoHalal && dish.name.toLowerCase().includes('halal'))) {
@@ -34,7 +31,6 @@ function getDietasCompatiblesDelPlato(dish: Dish): TipoDieta[] {
 
 function getPersonasEfectivasParaPlato(dish: Dish, counts: SectionCounts, personas: Persona[]): number {
   const dietasDelPlato = getDietasCompatiblesDelPlato(dish);
-  
   if (dietasDelPlato.length > 0) {
     let total = 0;
     dietasDelPlato.forEach(dieta => {
@@ -46,7 +42,6 @@ function getPersonasEfectivasParaPlato(dish: Dish, counts: SectionCounts, person
     SECTIONS.forEach((s) => {
       totalGeneral += (counts[s.id] || 0) * effectiveMultiplier(s);
     });
-    
     personas.forEach((p) => {
       if (p.dieta !== 'General' && esIncompatibleConDieta(dish, p.dieta)) {
         const section = SECTIONS.find(s => s.id === p.seccion);
@@ -57,7 +52,6 @@ function getPersonasEfectivasParaPlato(dish: Dish, counts: SectionCounts, person
   }
 }
 
-// ─── UTILIDADES PDF ───
 function consolidateIngredients(dishes: Dish[], comensales: number): ConsolidatedItem[] {
   const map = new Map<string, ConsolidatedItem>();
   dishes.forEach((dish) => {
@@ -88,7 +82,6 @@ function formatQty(amount: number, unit: string): string {
   return `${rounded} ${unit}`;
 }
 
-// ─── PDF DIARIO ───
 export function generateDailyShoppingPDF(
   dayMenu: DayMenu,
   allDishes: Dish[],
@@ -136,10 +129,8 @@ export function generateDailyShoppingPDF(
     mealDishes.forEach((dish) => {
       const dietas = getDietasCompatiblesDelPlato(dish);
       const grupoKey = dietas.length > 0 ? dietas[0] : 'General';
-      
       if (!grupos[grupoKey]) grupos[grupoKey] = { platos: [], maxComensales: 0 };
       grupos[grupoKey].platos.push(dish);
-      
       const comensales = getPersonasEfectivasParaPlato(dish, counts, personas);
       if (comensales > grupos[grupoKey].maxComensales) {
         grupos[grupoKey].maxComensales = comensales;
@@ -148,10 +139,9 @@ export function generateDailyShoppingPDF(
 
     Object.entries(grupos).forEach(([dieta, data]) => {
       if (data.maxComensales === 0 && data.platos.length > 0) {
-        data.maxComensales = 1; 
+        data.maxComensales = 1;
       }
       if (data.maxComensales === 0) return;
-      
       const ingredients = consolidateIngredients(data.platos, data.maxComensales);
       if (ingredients.length === 0) return;
 
@@ -179,7 +169,6 @@ export function generateDailyShoppingPDF(
   doc.save(`Compra_Dia_${dayMenu.day}.pdf`);
 }
 
-// ─── PDF GLOBAL 15 DÍAS ───
 export function generateGlobalShoppingPDF(
   menuList: DayMenu[],
   allDishes: Dish[],
@@ -211,14 +200,11 @@ export function generateGlobalShoppingPDF(
   menuList.forEach((dayMenu) => {
     const allMeals = [...(dayMenu.desayuno || []), ...(dayMenu.comida || []), ...(dayMenu.merienda || []), ...(dayMenu.cena || [])];
     const dayDishes = allDishes.filter((d) => allMeals.includes(d.id) || allMeals.includes(d.name));
-    
     dayDishes.forEach((dish) => {
       const dietas = getDietasCompatiblesDelPlato(dish);
       const grupoKey = dietas.length > 0 ? dietas[0] : 'General';
-      
       if (!globalGrupos[grupoKey]) globalGrupos[grupoKey] = { platos: [], maxComensales: 0 };
       globalGrupos[grupoKey].platos.push(dish);
-      
       const comensales = getPersonasEfectivasParaPlato(dish, counts, personas);
       if (comensales > globalGrupos[grupoKey].maxComensales) {
         globalGrupos[grupoKey].maxComensales = comensales;
@@ -229,7 +215,6 @@ export function generateGlobalShoppingPDF(
   Object.entries(globalGrupos).forEach(([dieta, data]) => {
     if (data.maxComensales === 0 && data.platos.length > 0) data.maxComensales = 1;
     if (data.maxComensales === 0) return;
-    
     const ingredients = consolidateIngredients(data.platos, data.maxComensales);
     if (ingredients.length === 0) return;
 
@@ -257,7 +242,6 @@ export function generateGlobalShoppingPDF(
   doc.save(`Compra_Global_15_Dias.pdf`);
 }
 
-// ─── PDF COMPRA POR PROVEEDOR ───
 export function generateCompraPorProveedorPDF(
   dayMenu: DayMenu,
   allDishes: Dish[],
@@ -268,18 +252,17 @@ export function generateCompraPorProveedorPDF(
 ): void {
   console.log('🚀 [PDF] Iniciando generación de PDF Proveedores...');
   console.log('📦 Proveedores recibidos:', proveedores.length);
-  
+
   try {
     const doc = new jsPDF();
     let currentY = 20;
 
     const todosIngredientes: { nombre: string; cantidad: number; unidad: string }[] = [];
     const meals: ('desayuno' | 'comida' | 'merienda' | 'cena')[] = ['desayuno', 'comida', 'merienda', 'cena'];
-    
+
     meals.forEach((meal) => {
       const dishIds = dayMenu[meal] || [];
       const dayDishes = allDishes.filter((d) => dishIds.includes(d.id) || dishIds.includes(d.name));
-      
       dayDishes.forEach((dish) => {
         const comensales = getPersonasEfectivasParaPlato(dish, counts, personas);
         (dish.ingredients || []).forEach((ing) => {
@@ -331,12 +314,12 @@ export function generateCompraPorProveedorPDF(
         doc.setTextColor(60, 60, 60);
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
-        
+
         const datosContacto: string[] = [];
         if (grupo.proveedor.telefono) datosContacto.push(`Tel: ${grupo.proveedor.telefono}`);
         if (grupo.proveedor.email) datosContacto.push(`Email: ${grupo.proveedor.email}`);
         if (grupo.proveedor.direccion) datosContacto.push(`Dir: ${grupo.proveedor.direccion}`);
-        
+
         if (datosContacto.length > 0) {
           doc.text(datosContacto.join('   |   '), 17, currentY);
           currentY += 5;
@@ -354,10 +337,10 @@ export function generateCompraPorProveedorPDF(
           headStyles: { fillColor: [251, 146, 60], textColor: 255, fontStyle: 'bold', fontSize: 9 },
           alternateRowStyles: { fillColor: [255, 247, 237] },
           styles: { fontSize: 9, cellPadding: 2 },
-          columnStyles: { 
-            0: { cellWidth: 100 }, 
-            1: { cellWidth: 45, halign: 'right' }, 
-            2: { cellWidth: 30, halign: 'center' } 
+          columnStyles: {
+            0: { cellWidth: 100 },
+            1: { cellWidth: 45, halign: 'right' },
+            2: { cellWidth: 30, halign: 'center' }
           },
           didDrawPage: (d) => { currentY = (d as any).cursor.y + 5; },
         });
@@ -388,7 +371,4 @@ export function generateCompraPorProveedorPDF(
     console.error('❌ ERROR CRÍTICO en generateCompraPorProveedorPDF:', error);
     alert('Hubo un error al generar el PDF. Revisa la consola (F12) para ver el detalle.');
   }
-}
-
-  doc.save(`Compra_Proveedores_Dia_${dayMenu.day}.pdf`);
 }
