@@ -253,8 +253,14 @@ export function detectAllergenConflicts(dish: Dish, personas: Persona[]) {
       });
     }
 
-    // 3. Detectar incompatibilidad por dieta
-    if (persona.dieta && persona.dieta !== 'General') {
+        // 3. Detectar incompatibilidad por dieta
+    // Si el plato está marcado con una dieta que coincide con la de la persona, NO hay conflicto
+    const dietaDelPlato = dish.diets?.find(d => {
+      const dietaLower = d.toLowerCase();
+      return persona.dieta?.toLowerCase().includes(dietaLower) || dietaLower.includes(persona.dieta?.toLowerCase() || '');
+    });
+    
+    if (persona.dieta && persona.dieta !== 'General' && !dietaDelPlato) {
       if (esIncompatibleConDieta(dish, persona.dieta)) {
         tipoConflicto = 'dieta';
         if (persona.dieta === 'Pescetariano' && !alergiasCoincidentes.some(a => a.toLowerCase().includes('carne'))) {
