@@ -639,12 +639,15 @@ export default function App() {
                 <FileDown className="w-3.5 h-3.5" />
                 <span>PDF Día</span>
               </button>
-                            {/* Botón PDF por Proveedor */}
+                                          {/* Botón PDF por Proveedor */}
               <button
                 onClick={() => {
                   const currentDayMenu = menuList.find((m) => m.day === selectedCampDay);
                   if (currentDayMenu) {
-                    generateCompraPorProveedorPDF(currentDayMenu, dishesList, counts, personasList, proveedoresList, campamentosList);
+                    console.log('🖨️ [APP] Click en PDF Proveedores. Día:', currentDayMenu.day);
+                    generateCompraPorProveedorPDF(currentDayMenu, dishesList, counts, personasList, proveedoresList);
+                  } else {
+                    alert('No hay menú planificado para este día.');
                   }
                 }}
                 className="flex items-center justify-center gap-1.5 bg-indigo-600 text-white rounded-xl px-3 py-2 text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm flex-1 sm:flex-initial"
