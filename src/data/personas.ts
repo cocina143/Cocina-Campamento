@@ -37,13 +37,26 @@ export async function savePersonaToSupabase(persona: Persona): Promise<void> {
 
 export function getComensalesPorSeccionYDieta(counts: SectionCounts, personas: Persona[]): Record<SectionId, Record<TipoDieta, number>> {
   const resultado: Record<string, Record<TipoDieta, number>> = {};
-  SECTIONS.forEach((s) => { resultado[s.id] = { General: counts[s.id] || 0, Halal: 0, Vegetariano: 0, Vegano: 0 }; });
+  
+  // INICIALIZAR TODAS LAS DIETAS DISPONIBLES
+  SECTIONS.forEach((s) => { 
+    resultado[s.id] = { 
+      General: counts[s.id] || 0, 
+      Halal: 0, 
+      Vegetariano: 0, 
+      Vegano: 0,
+      Pescetariano: 0,
+      'Sin Gluten': 0
+    }; 
+  });
+  
   personas.forEach((p) => {
     if (p.dieta !== 'General' && p.seccion && resultado[p.seccion]) {
       resultado[p.seccion][p.dieta] = (resultado[p.seccion][p.dieta] || 0) + 1;
       resultado[p.seccion].General = Math.max(0, resultado[p.seccion].General - 1);
     }
   });
+  
   return resultado as Record<SectionId, Record<TipoDieta, number>>;
 }
 
