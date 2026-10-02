@@ -1,8 +1,13 @@
 import type { Dish } from '@/data/dishes';
 import type { SectionCounts } from '@/data/sections';
 import { SECTIONS, effectiveMultiplier } from '@/data/sections';
-import type { Persona, TipoDieta } from '@/data/personas';
-import { getTotalPersonasConDieta, getPersonasQueNoPuedenComer } from '@/data/personas';
+import type { Persona } from '@/data/personas';
+import { 
+  getTotalPersonasConDieta, 
+  getDietasCompatiblesDelPlato, 
+  esIncompatibleConDieta, 
+  esIncompatibleConAlergenos 
+} from '@/data/personas';
 import { getFallbackImage } from '@/services/imageService';
 
 interface DishCardProps {
@@ -40,57 +45,70 @@ function formatAmount(amount: number, unit: string): string {
   return `${rounded} ${unit}`;
 }
 
-function getDietaDelPlato(dish: Dish): TipoDieta | null {
-  if (dish.diets?.includes('vegano')) return 'Vegano';
-  if (dish.diets?.includes('vegetariano')) return 'Vegetariano';
-  const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
-  const tieneNoHalal = dish.ingredients?.some((ing) =>
-    noHalal.some((nh) => ing.name.toLowerCase().includes(nh))
-  );
-  if (!tieneNoHalal && dish.name.toLowerCase().includes('halal')) return 'Halal';
-  return null;
-}
-
-function getPersonasEfectivas(dish: Dish, counts: SectionCounts, personas: Persona[]): number {
-  const dietaDelPlato = getDietaDelPlato(dish);
-  
-  if (dietaDelPlato) {
-    // Plato con dieta específica: calcular solo para personas con esa dieta
-    return getTotalPersonasConDieta(counts, personas, dietaDelPlato);
-  }
-  
-  // Plato General: calcular para todos MENOS los que no pueden comerlo por su dieta
-  let total = 0;
-  SECTIONS.forEach((s) => {
-    const totalSeccion = counts[s.id] || 0;
-    total += totalSeccion * effectiveMultiplier(s);
-  });
-  
-  // Restar personas que no pueden comer este plato (ej: vegetarianos en plato con carne)
-  const personasQueNoPueden = getPersonasQueNoPuedenComer(dish, counts, personas);
-  return Math.max(0, total - personasQueNoPueden);
-}
-
 export function DishCard({ dish, counts, checkedCount, onClick, personas = [] }: DishCardProps) {
-  const totalEfectivo = getPersonasEfectivas(dish, counts, personas);
   const totalIngredients = dish.ingredients?.length || 0;
   const progress = totalIngredients > 0 ? (checkedCount / totalIngredients) * 100 : 0;
-  const dietaDelPlato = getDietaDelPlato(dish);
+  
+  // 1. Obtener TODAS las dietas compatibles con el plato
+  const dietasDelPlato = getDietasCompatiblesDelPlato(dish);
+  
+  let totalEfectivo = 0;
+  let tituloDieta = 'General';
 
-  // Etiquetas de dieta
+  // 2. Calcular raciones sumando todas las dietas compatibles
+  if (dietasDelPlato.length > 0) {
+    dietasDelPlato.forEach(dieta => {
+      totalEfectivo += getTotalPersonasConDieta(counts, personas, dieta);
+    });
+    tituloDieta = dietasDelPlato.join(' / ');
+  } else {
+    // Plato General: calcular para todos MENOS los que no pueden comerlo (por dieta o alergia)
+    let personasQuePuedenTotal = 0;
+    SECTIONS.forEach((s) => {
+      const totalSeccion = counts[s.id] || 0;
+      const personasDeSeccion = personas.filter((p) => p.seccion === s.id);
+      let personasQuePueden = totalSeccion;
+      
+      personasDeSeccion.forEach((p) => {
+        if (p.dieta !== 'General' && esIncompatibleConDieta(dish, p.dieta)) {
+          personasQuePueden--;
+        }
+        if (esIncompatibleConAlergenos(dish, p)) {
+          personasQuePueden--;
+        }
+      });
+      
+      personasQuePuedenTotal += Math.max(0, personasQuePueden) * effectiveMultiplier(s);
+    });
+    totalEfectivo = personasQuePuedenTotal;
+  }
+
+  // 3. Generar etiquetas de dieta dinámicamente
   const dietTags = [];
-  if (dish.diets?.includes('vegetariano')) dietTags.push({ label: '🥬 Vegetariano', color: 'bg-green-500 text-white' });
-  if (dish.diets?.includes('vegano')) dietTags.push({ label: '🌱 Vegano', color: 'bg-emerald-600 text-white' });
+  const dietsLower = (dish.diets || []).map(d => d.toLowerCase());
+  if (dietsLower.includes('vegetariano')) dietTags.push({ label: '🥬 Vegetariano', color: 'bg-green-500 text-white' });
+  if (dietsLower.includes('vegano')) dietTags.push({ label: '🌱 Vegano', color: 'bg-emerald-600 text-white' });
+  if (dietsLower.includes('pescetariano')) dietTags.push({ label: '🐟 Pescetariano', color: 'bg-cyan-500 text-white' });
+  if (dietsLower.includes('halal')) dietTags.push({ label: '☪️ Halal', color: 'bg-blue-500 text-white' });
+  if (dietsLower.includes('sin gluten')) dietTags.push({ label: '🌾 Sin Gluten', color: 'bg-amber-500 text-white' });
 
-  // Etiquetas de alérgenos
+  // 4. Generar etiquetas de alérgenos
   const allergenTags = [];
   if (dish.allergens?.includes('gluten')) allergenTags.push({ label: '🌾 Gluten', color: 'bg-amber-500 text-white' });
   if (dish.allergens?.includes('lactosa')) allergenTags.push({ label: '🥛 Lactosa', color: 'bg-blue-400 text-white' });
   if (dish.allergens?.includes('huevo')) allergenTags.push({ label: '🥚 Huevo', color: 'bg-yellow-500 text-white' });
-  if (dish.allergens?.includes('pescado')) allergenTags.push({ label: '🐟 Pescado', color: 'bg-cyan-500 text-white' });
+  if (dish.allergens?.includes('pescado')) allergenTags.push({ label: '🐟 Pescado', color: 'bg-cyan-600 text-white' });
   if (dish.allergens?.includes('marisco')) allergenTags.push({ label: '🦐 Marisco', color: 'bg-red-500 text-white' });
   if (dish.allergens?.includes('frutos_secos')) allergenTags.push({ label: '🥜 Frutos secos', color: 'bg-orange-600 text-white' });
   if (dish.allergens?.includes('soja')) allergenTags.push({ label: '🫘 Soja', color: 'bg-lime-600 text-white' });
+
+  // 5. Determinar color de la insignia inferior
+  const badgeColor = dietasDelPlato.includes('Vegano') ? 'bg-emerald-100 text-emerald-700' :
+                     dietasDelPlato.includes('Vegetariano') ? 'bg-green-100 text-green-700' :
+                     dietasDelPlato.includes('Pescetariano') ? 'bg-cyan-100 text-cyan-700' :
+                     dietasDelPlato.includes('Halal') ? 'bg-blue-100 text-blue-700' :
+                     dietasDelPlato.includes('Sin Gluten') ? 'bg-amber-100 text-amber-700' :
+                     'bg-stone-100 text-stone-700';
 
   return (
     <button
@@ -154,23 +172,12 @@ export function DishCard({ dish, counts, checkedCount, onClick, personas = [] }:
               <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">
                 Ingredientes
               </p>
-              {dietaDelPlato ? (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                  dietaDelPlato === 'Vegetariano' ? 'bg-green-100 text-green-700' :
-                  dietaDelPlato === 'Vegano' ? 'bg-emerald-100 text-emerald-700' :
-                  dietaDelPlato === 'Halal' ? 'bg-blue-100 text-blue-700' :
-                  'bg-stone-100 text-stone-700'
-                }`}>
-                  {totalEfectivo.toFixed(1)} rac. {dietaDelPlato}
-                </span>
-              ) : (
-                <span className="text-[10px] font-bold text-stone-500">
-                  {totalEfectivo.toFixed(1)} rac. General
-                </span>
-              )}
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${badgeColor}`}>
+                {totalEfectivo.toFixed(1)} rac. {tituloDieta}
+              </span>
             </div>
             <div className="space-y-0.5 max-h-24 overflow-y-auto">
-              {dish.ingredients.map((ing, idx) => {
+              {dish.ingredients.slice(0, 4).map((ing, idx) => {
                 const amountPerPerson = Number(ing.amount) || 0;
                 const totalAmount = amountPerPerson * totalEfectivo;
                 return (
@@ -182,6 +189,9 @@ export function DishCard({ dish, counts, checkedCount, onClick, personas = [] }:
                   </div>
                 );
               })}
+              {dish.ingredients.length > 4 && (
+                <p className="text-[10px] text-stone-400 text-right italic">+ {dish.ingredients.length - 4} más...</p>
+              )}
             </div>
           </div>
         )}
