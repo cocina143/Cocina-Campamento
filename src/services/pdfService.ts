@@ -168,11 +168,16 @@ export function generateDailyShoppingPDF(
       doc.text(`${dieta} (${data.maxComensales.toFixed(1)} raciones)`, 14, currentY);
       currentY += 4;
 
-      autoTable(doc, {
+            autoTable(doc, {
         startY: currentY,
         head: [['Ingrediente', 'Cantidad', 'Unidad']],
-        body: ingredients.map((item) => [item.name, formatQty(item.amount, item.unit), item.unit]),
+        body: grupo.ingredientes.map((ing: any) => [
+          ing.nombre,
+          formatQty(ing.cantidad, ing.unidad),
+          ing.unidad
+        ]),
         theme: 'grid',
+       
         headStyles: { fillColor: [251, 146, 60], textColor: 255, fontStyle: 'bold', fontSize: 9 },
         alternateRowStyles: { fillColor: [255, 247, 237] },
         styles: { fontSize: 9, cellPadding: 2 },
