@@ -275,7 +275,7 @@ export function generateCompraPorProveedorPDF(
   const doc = new jsPDF();
   let currentY = 20;
 
-  const todosIngredientes: { nombre: string; cantidad: number; unidad: string }[] = [];
+    const todosIngredientes: { nombre: string; cantidad: number; unidad: string }[] = [];
   const meals: ('desayuno' | 'comida' | 'merienda' | 'cena')[] = ['desayuno', 'comida', 'merienda', 'cena'];
   
   meals.forEach((meal) => {
@@ -291,8 +291,17 @@ export function generateCompraPorProveedorPDF(
     });
   });
 
-  const porProveedor = agruparIngredientesPorProveedor(todosIngredientes, proveedores);
+  // ─── NUEVO: Filtrar proveedores por el año en curso ───
+  const currentYear = new Date().getFullYear().toString(); // Ej: "2026"
+  
+  const proveedoresDelAnio = proveedores.filter((prov) => {
+    // Incluye al proveedor si su campo 'fecha' existe y contiene el año actual
+    // (Funciona tanto si la fecha es "2026" como si es "2026-01-01")
+    return prov.fecha && String(prov.fecha).includes(currentYear);
+  });
 
+  // Usamos el array filtrado en lugar del original
+  const porProveedor = agruparIngredientesPorProveedor(todosIngredientes, proveedoresDelAnio);
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
   doc.text(campName, 14, currentY);
