@@ -278,15 +278,15 @@ export function generateCompraPorProveedorPDF(
   counts: SectionCounts,
   personas: Persona[],
   proveedores: Proveedor[],
-  campamentos: Campamento[] = [],
   campName: string = 'Cocina La Milagrosa 143'
 ): void {
   const doc = new jsPDF();
   let currentY = 20;
 
-    const todosIngredientes: { nombre: string; cantidad: number; unidad: string }[] = [];
+  const todosIngredientes: { nombre: string; cantidad: number; unidad: string }[] = [];
   const meals: ('desayuno' | 'comida' | 'merienda' | 'cena')[] = ['desayuno', 'comida', 'merienda', 'cena'];
   
+  // 1. Recopilar todos los ingredientes del día
   meals.forEach((meal) => {
     const dishIds = dayMenu[meal] || [];
     const dayDishes = allDishes.filter((d) => dishIds.includes(d.id) || dishIds.includes(d.name));
@@ -300,36 +300,101 @@ export function generateCompraPorProveedorPDF(
     });
   });
 
-  // ─── FILTRO: Solo proveedores activos en el año en curso (por UUID de campamento) ───
-  const currentYear = new Date().getFullYear().toString(); // Ej: "2026"
-  
-  // 1. Filtrar campamentos cuyo nombre incluya el año actual
-  const campamentosDelAnio = campamentos.filter((camp) => 
-    camp.nombre && String(camp.nombre).includes(currentYear)
-  );
-  
-  // 2. Extraer los UUIDs de esos campamentos
-  const uuidsCampamentosDelAnio = campamentosDelAnio.map((camp) => camp.id);
-  
-  console.log(`🔍 Filtro de proveedores: Año ${currentYear}`);
-  console.log(`📋 Campamentos del año:`, campamentosDelAnio.map(c => c.nombre));
-  console.log(`🆔 UUIDs:`, uuidsCampamentosDelAnio);
-  
-  // 3. Filtrar proveedores que tengan al menos uno de esos UUIDs en su lista
-  const proveedoresDelAnio = proveedores.filter((prov) => {
-    return prov.campamentos && prov.campamentos.some((campUUID) => 
-      uuidsCampamentosDelAnio.includes(campUUID)
-    );
-  });
+  // 2. Agrupar ingredientes por proveedor (usa TODOS los proveedores registrados)
+  const porProveedor = agruparIngredientesPorProveedor(todosIngredientes, proveedores);
 
-  console.log(`✅ Proveedores filtrados: ${proveedoresDelAnio.length} de ${proveedores.length}`);
+  // 3. Generar el PDF
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text(campName, 14, currentY);
+  currentY += 8;
 
-  // 🛡️ RESPALDO: Si el filtro oculta a todos, usamos todos los proveedores para no dejar la lista vacía
-  const proveedoresAUsar = proveedoresDelAnio.length > 0 ? proveedoresDelAnio : proveedores;
-  
-  if (proveedoresDelAnio.length === 0 && proveedores.length > 0) {
-    console.warn(`⚠️ ALERTA PDF: Ningún proveedor está asociado a campamentos de ${currentYear}. Se mostrarán TODOS.`);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Lista de Compra por Proveedor — Día ${dayMenu.day}`, 14, currentY);
+  currentY += 6;
+
+  doc.setFontSize(10);
+  doc.setTextColor(60, 60, 60);
+  doc.text(`Generado: ${new Date().toLocaleDateString('es-ES')}`, 14, currentY);
+  currentY += 10;
+
+  if (porProveedor.length === 0) {
+    doc.setFontSize(12);
+    doc.text('No hay ingredientes para este día.', 14, currentY);
+  } else {
+    porProveedor.forEach((grupo, idx) => {
+      if (currentY > 220) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      // Cabecera del proveedor
+      doc.setFillColor(234, 88, 12);
+      doc.rect(14, currentY - 4, 182, 10, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${idx + 1}. ${grupo.proveedor.nombre}`, 17, currentY + 2);
+      currentY += 10;
+
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      
+      const datosContacto: string[] = [];
+      if (grupo.proveedor.telefono) datosContacto.push(`Tel: ${grupo.proveedor.telefono}`);
+      if (grupo.proveedor.email) datosContacto.push(`Email: ${grupo.proveedor.email}`);
+      if (grupo.proveedor.direccion) datosContacto.push(`Dir: ${grupo.proveedor.direccion}`);
+      
+      if (datosContacto.length > 0) {
+        doc.text(datosContacto.join('   |   '), 17, currentY);
+        currentY += 5;
+      }
+
+      // Tabla de ingredientes (SIN la leyenda "también en")
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Ingrediente', 'Cantidad', 'Unidad']],
+        body: grupo.ingredientes.map((ing: any) => [
+          ing.nombre,
+          formatQty(ing.cantidad, ing.unidad),
+          ing.unidad
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [251, 146, 60], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+        alternateRowStyles: { fillColor: [255, 247, 237] },
+        styles: { fontSize: 9, cellPadding: 2 },
+        columnStyles: { 
+          0: { cellWidth: 100 }, 
+          1: { cellWidth: 45, halign: 'right' }, 
+          2: { cellWidth: 30, halign: 'center' } 
+        },
+        didDrawPage: (d) => { currentY = (d as any).cursor.y + 5; },
+      });
+
+      currentY += 2;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Total: ${grupo.ingredientes.length} productos`, 17, currentY);
+      currentY += 8;
+    });
   }
+
+  // Pie de página
+  const pageCount = (doc as any).internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`${campName} — ${new Date().toLocaleDateString('es-ES')}`, 14, doc.internal.pageSize.height - 10);
+    doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
+  }
+
+  doc.save(`Compra_Proveedores_Dia_${dayMenu.day}.pdf`);
+}
 
   // Usamos el array filtrado (o el de respaldo) en lugar del original
   const porProveedor = agruparIngredientesPorProveedor(todosIngredientes, proveedoresAUsar);
