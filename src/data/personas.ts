@@ -208,19 +208,25 @@ const ALERGENO_A_PALABRAS: Record<string, string[]> = {
   'moluscos': ['moluscos', 'mejillon', 'mejillón', 'almeja', 'calamar', 'pulpo', 'sepia'],
 };
 // Devuelve un array con TODAS las dietas para las que es apto el plato
+// Usa comparación case-insensitive para ser robusto frente a datos de Supabase
 export function getDietasCompatiblesDelPlato(dish: Dish): TipoDieta[] {
   const dietas: TipoDieta[] = [];
-  if (dish.diets?.includes('vegano')) dietas.push('Vegano');
-  if (dish.diets?.includes('vegetariano')) dietas.push('Vegetariano');
-  if (dish.diets?.includes('pescetariano')) dietas.push('Pescetariano');
+  
+  // Normalizar las dietas del plato a minúsculas para comparar
+  const dietsLower = (dish.diets || []).map(d => d.toLowerCase().trim());
+  
+  if (dietsLower.includes('vegano')) dietas.push('Vegano');
+  if (dietsLower.includes('vegetariano')) dietas.push('Vegetariano');
+  if (dietsLower.includes('pescetariano')) dietas.push('Pescetariano');
   
   const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
   const tieneNoHalal = dish.ingredients?.some((ing) =>
     noHalal.some((nh) => ing.name.toLowerCase().includes(nh))
   );
-  if (dish.diets?.includes('halal' as any) || (!tieneNoHalal && dish.name.toLowerCase().includes('halal'))) {
+  if (dietsLower.includes('halal') || (!tieneNoHalal && dish.name.toLowerCase().includes('halal'))) {
     dietas.push('Halal');
   }
+  
   return dietas;
 }
 // Detecta conflictos de alergias Y de dieta para un plato
