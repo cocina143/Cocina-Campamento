@@ -29,7 +29,7 @@ function getDietaDelPlato(dish: Dish): TipoDieta | null {
   }
   return null;
 }
-}
+
 
 // ─── Lista exhaustiva de carnes y productos cárnicos ─────────
 const CARNES_Y_DERIVADOS = [
