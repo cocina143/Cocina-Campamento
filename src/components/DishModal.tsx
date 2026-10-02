@@ -3,7 +3,7 @@ import type { Dish } from '@/data/dishes';
 import type { SectionCounts } from '@/data/sections';
 import { SECTIONS, effectiveMultiplier } from '@/data/sections';
 import type { Persona, TipoDieta } from '@/data/personas';
-import { getDesglosePorSeccionParaDieta, getTotalPersonasConDieta, esIncompatibleConDieta, esIncompatibleConAlergenos } from '@/data/personas';
+import { getDesglosePorSeccionParaDieta, getTotalPersonasConDieta, esIncompatibleConDieta, esIncompatibleConAlergenos, getDietasCompatiblesDelPlato } from '@/data/personas';
 
 interface DishModalProps {
   dish: Dish;
@@ -39,34 +39,41 @@ function formatAmount(amount: number, unit: string): { value: string; unit: stri
   return { value: rounded, unit };
 }
 
-// Determina qué dieta aplica a este plato
-function getDietaDelPlato(dish: Dish): TipoDieta | null {
-  if (dish.diets?.includes('vegano')) return 'Vegano';
-  if (dish.diets?.includes('vegetariano')) return 'Vegetariano';
-  if (dish.diets?.includes('pescetariano')) return 'Pescetariano';
-  
-  const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
-  const tieneNoHalal = dish.ingredients?.some((ing) =>
-    noHalal.some((nh) => ing.name.toLowerCase().includes(nh))
-  );
-  if (dish.diets?.includes('halal' as any) || (!tieneNoHalal && dish.name.toLowerCase().includes('halal'))) {
-    return 'Halal';
-  }
-  return null;
-}
-
 export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient, onClose, personas = [] }: DishModalProps) {
-  const dietaDelPlato = getDietaDelPlato(dish);
+  const dietasDelPlato = getDietasCompatiblesDelPlato(dish);
 
-  let desglose: { sectionId: string; sectionName: string; count: number; multiplier: number; effectiveCount: number }[];
-  let totalEfectivo: number;
-  let tituloDieta: string;
+  let desglose: { sectionId: string; sectionName: string; count: number; multiplier: number; effectiveCount: number }[] = [];
+  let totalEfectivo: number = 0;
+  let tituloDieta: string = 'GENERAL';
 
-  if (dietaDelPlato) {
-    desglose = getDesglosePorSeccionParaDieta(counts, personas, dietaDelPlato);
-    totalEfectivo = getTotalPersonasConDieta(counts, personas, dietaDelPlato);
-    tituloDieta = `${dietaDelPlato.toUpperCase()} (${totalEfectivo.toFixed(1)} raciones)`;
+  if (dietasDelPlato.length > 0) {
+    // Sumar personas de TODAS las dietas compatibles
+    const seccionesMap = new Map<string, { sectionName: string; count: number; effectiveCount: number }>();
+    
+    dietasDelPlato.forEach(dieta => {
+      const desgloseDieta = getDesglosePorSeccionParaDieta(counts, personas, dieta);
+      desgloseDieta.forEach(item => {
+        if (!seccionesMap.has(item.sectionId)) {
+          seccionesMap.set(item.sectionId, { sectionName: item.sectionName, count: 0, effectiveCount: 0 });
+        }
+        const current = seccionesMap.get(item.sectionId)!;
+        current.count += item.count;
+        current.effectiveCount += item.effectiveCount;
+      });
+      totalEfectivo += getTotalPersonasConDieta(counts, personas, dieta);
+    });
+
+    desglose = Array.from(seccionesMap.entries()).map(([sectionId, data]) => ({
+      sectionId,
+      sectionName: data.sectionName,
+      count: data.count,
+      multiplier: 1,
+      effectiveCount: data.effectiveCount,
+    }));
+
+    tituloDieta = `${dietasDelPlato.join(' / ').toUpperCase()} (${totalEfectivo.toFixed(1)} raciones)`;
   } else {
+    // Plato General: calcular para todos MENOS los que no pueden comerlo
     desglose = SECTIONS.map((s) => {
       const totalSeccion = counts[s.id] || 0;
       const personasDeSeccion = personas.filter((p) => p.seccion === s.id);
@@ -98,6 +105,12 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
     tituloDieta = `GENERAL (${totalEfectivo.toFixed(1)} raciones)`;
   }
 
+  const badgeColor = dietasDelPlato.includes('Vegano') ? 'bg-emerald-100 text-emerald-800' :
+                     dietasDelPlato.includes('Vegetariano') ? 'bg-green-100 text-green-800' :
+                     dietasDelPlato.includes('Pescetariano') ? 'bg-cyan-100 text-cyan-800' :
+                     dietasDelPlato.includes('Halal') ? 'bg-blue-100 text-blue-800' :
+                     'bg-stone-100 text-stone-700';
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-white w-full sm:max-w-2xl sm:rounded-3xl rounded-t-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -116,13 +129,7 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
           <div>
             <h3 className="text-sm font-bold text-stone-500 uppercase tracking-wider mb-3 flex items-center gap-2 flex-wrap">
               Ingredientes y Cantidades
-              <span className={`text-xs px-2 py-0.5 rounded-full normal-case font-bold ${
-                dietaDelPlato === 'Halal' ? 'bg-blue-100 text-blue-800' :
-                dietaDelPlato === 'Vegetariano' ? 'bg-green-100 text-green-800' :
-                dietaDelPlato === 'Vegano' ? 'bg-emerald-100 text-emerald-800' :
-                dietaDelPlato === 'Pescetariano' ? 'bg-cyan-100 text-cyan-800' :
-                'bg-stone-100 text-stone-700'
-              }`}>
+              <span className={`text-xs px-2 py-0.5 rounded-full normal-case font-bold ${badgeColor}`}>
                 {tituloDieta}
               </span>
             </h3>
