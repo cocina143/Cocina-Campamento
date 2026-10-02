@@ -467,10 +467,11 @@ export default function App() {
       const dishIds = currentDayMenu[key] || [];
       const dishes = dishesList.filter((dish) => {
         const isPlanned = dishIds.includes(dish.id) || dishIds.includes(dish.name);
-        const matchesCategory = filter === 'General' || 
+                const matchesCategory = filter === 'General' || 
   (filter === 'Vegetariano' && (dish.diets?.includes('vegetariano') || dish.diets?.includes('vegano'))) || 
+  (filter === 'Pescetariano' && dish.diets?.includes('pescetariano')) ||
   (filter === 'Halal' && !dish.ingredients?.some((ing) => /cerdo|jamón|jamon|bacon|beicon|alcohol|vino|cerveza|mor cilla|morcilla/i.test(ing.name))) ||
-  (filter === 'Sin Gluten' && !dish.ingredients?.some((ing) => /gluten|trigo|centeno|cebada|avena|harina|pan|pasta|macarrones|cuscus|rebozado|empanado/i.test(ing.name)) && !dish.allergens?.includes('gluten'));;
+  (filter === 'Sin Gluten' && !dish.ingredients?.some((ing) => /gluten|trigo|centeno|cebada|avena|harina|pan|pasta|macarrones|cuscus|rebozado|empanado/i.test(ing.name)) && !dish.allergens?.includes('gluten'));
         return isPlanned && matchesCategory;
       });
       return { key, label, icon, dishes };
