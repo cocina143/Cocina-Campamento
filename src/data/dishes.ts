@@ -100,7 +100,7 @@ export async function getDishesFromSupabase(): Promise<Dish[]> {
     return INITIAL_DISHES; // Fallback seguro
   }
 
-  return data.map((d: any) => ({
+    return data.map((d: any) => ({
     id: String(d.id),
     name: String(d.name),
     category: d.category === 'Especial' ? 'Especial' : 'Plato principal',
@@ -112,8 +112,13 @@ export async function getDishesFromSupabase(): Promise<Dish[]> {
           unit: String(ing.unit || 'g'),
         }))
       : [],
-    allergens: Array.isArray(d.allergens) ? d.allergens : [],
-    diets: Array.isArray(d.diets) ? d.diets : [],
+    // Normalizar a minúsculas y quitar espacios para evitar errores de comparación
+    allergens: Array.isArray(d.allergens) 
+      ? d.allergens.map((a: string) => String(a).toLowerCase().trim()) 
+      : [],
+    diets: Array.isArray(d.diets) 
+      ? d.diets.map((d: string) => String(d).toLowerCase().trim()) 
+      : [],
   }));
 }
 
