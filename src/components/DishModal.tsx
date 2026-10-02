@@ -41,21 +41,9 @@ function formatAmount(amount: number, unit: string): { value: string; unit: stri
 
 // Determina qué dieta aplica a este plato
 function getDietaDelPlato(dish: Dish): TipoDieta | null {
-    // Orden de prioridad: la más restrictiva primero
   if (dish.diets?.includes('vegano')) return 'Vegano';
   if (dish.diets?.includes('vegetariano')) return 'Vegetariano';
   if (dish.diets?.includes('pescetariano')) return 'Pescetariano';
-  
-  // Detectar Halal por etiqueta o por ingredientes
-  const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
-  const tieneNoHalal = dish.ingredients?.some((ing) =>
-    noHalal.some((nh) => ing.name.toLowerCase().includes(nh))
-  );
-  if (dish.diets?.includes('halal' as any) || (!tieneNoHalal && dish.name.toLowerCase().includes('halal'))) {
-    return 'Halal';
-  }
-  return null;
-}
   
   const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
   const tieneNoHalal = dish.ingredients?.some((ing) =>
@@ -70,31 +58,26 @@ function getDietaDelPlato(dish: Dish): TipoDieta | null {
 export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient, onClose, personas = [] }: DishModalProps) {
   const dietaDelPlato = getDietaDelPlato(dish);
 
-  // Calcular desglose según la dieta del plato
   let desglose: { sectionId: string; sectionName: string; count: number; multiplier: number; effectiveCount: number }[];
   let totalEfectivo: number;
   let tituloDieta: string;
 
   if (dietaDelPlato) {
-    // Plato con dieta específica: calcular solo para personas con esa dieta
     desglose = getDesglosePorSeccionParaDieta(counts, personas, dietaDelPlato);
     totalEfectivo = getTotalPersonasConDieta(counts, personas, dietaDelPlato);
     tituloDieta = `${dietaDelPlato.toUpperCase()} (${totalEfectivo.toFixed(1)} raciones)`;
   } else {
-    // Plato General: calcular para todos MENOS los que no pueden comerlo (por dieta O por alergia)
     desglose = SECTIONS.map((s) => {
       const totalSeccion = counts[s.id] || 0;
       const personasDeSeccion = personas.filter((p) => p.seccion === s.id);
       let personasQuePueden = totalSeccion;
       
-      // 1. Restar personas cuya dieta sea incompatible con este plato
       personasDeSeccion.forEach((p) => {
         if (p.dieta !== 'General' && esIncompatibleConDieta(dish, p.dieta)) {
           personasQuePueden--;
         }
       });
       
-      // 2. NUEVO: Restar personas con alergias incompatibles con los alérgenos del plato
       personasDeSeccion.forEach((p) => {
         if (esIncompatibleConAlergenos(dish, p)) {
           personasQuePueden--;
@@ -105,7 +88,7 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
       return {
         sectionId: s.id,
         sectionName: s.shortName,
-        count: Math.max(0, personasQuePueden), // Asegurar que nunca sea negativo
+        count: Math.max(0, personasQuePueden),
         multiplier,
         effectiveCount: Math.max(0, personasQuePueden) * multiplier,
       };
@@ -137,6 +120,7 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
                 dietaDelPlato === 'Halal' ? 'bg-blue-100 text-blue-800' :
                 dietaDelPlato === 'Vegetariano' ? 'bg-green-100 text-green-800' :
                 dietaDelPlato === 'Vegano' ? 'bg-emerald-100 text-emerald-800' :
+                dietaDelPlato === 'Pescetariano' ? 'bg-cyan-100 text-cyan-800' :
                 'bg-stone-100 text-stone-700'
               }`}>
                 {tituloDieta}
