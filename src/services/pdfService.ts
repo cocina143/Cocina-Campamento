@@ -1,3 +1,4 @@
+import type { Campamento } from '@/data/campamentos';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Dish } from '@/data/dishes';
@@ -264,8 +265,17 @@ export function generateGlobalShoppingPDF(
 }
 
 // ─── PDF COMPRA POR PROVEEDOR ───
+import type { Campamento } from '@/data/campamentos';
+
 export function generateCompraPorProveedorPDF(
   dayMenu: DayMenu,
+  allDishes: Dish[],
+  counts: SectionCounts,
+  personas: Persona[],
+  proveedores: Proveedor[],
+  campamentos: Campamento[] = [], // <-- AÑADIDO
+  campName: string = 'Cocina La Milagrosa 143'
+): void {
   allDishes: Dish[],
   counts: SectionCounts,
   personas: Persona[],
@@ -291,16 +301,40 @@ export function generateCompraPorProveedorPDF(
     });
   });
 
-    // ─── FILTRO: Solo proveedores activos en el año en curso ───
+  // ─── FILTRO: Solo proveedores activos en el año en curso (por UUID de campamento) ───
   const currentYear = new Date().getFullYear().toString(); // Ej: "2026"
   
+  // 1. Filtrar campamentos cuyo nombre incluya el año actual
+  const campamentosDelAnio = campamentos.filter((camp) => 
+    camp.nombre && String(camp.nombre).includes(currentYear)
+  );
+  
+  // 2. Extraer los UUIDs de esos campamentos
+  const uuidsCampamentosDelAnio = campamentosDelAnio.map((camp) => camp.id);
+  
+  console.log(`🔍 Filtro de proveedores: Año ${currentYear}`);
+  console.log(`📋 Campamentos del año:`, campamentosDelAnio.map(c => c.nombre));
+  console.log(`🆔 UUIDs:`, uuidsCampamentosDelAnio);
+  
+  // 3. Filtrar proveedores que tengan al menos uno de esos UUIDs en su lista
   const proveedoresDelAnio = proveedores.filter((prov) => {
-    // Verifica si el proveedor tiene campamentos asignados y si alguno incluye el año actual
-    return prov.campamentos && prov.campamentos.some((camp) => String(camp).includes(currentYear));
+    return prov.campamentos && prov.campamentos.some((campUUID) => 
+      uuidsCampamentosDelAnio.includes(campUUID)
+    );
   });
 
-  // Usamos el array filtrado en lugar del original
-  const porProveedor = agruparIngredientesPorProveedor(todosIngredientes, proveedoresDelAnio);
+  console.log(`✅ Proveedores filtrados: ${proveedoresDelAnio.length} de ${proveedores.length}`);
+
+  // 🛡️ RESPALDO: Si el filtro oculta a todos, usamos todos los proveedores para no dejar la lista vacía
+  const proveedoresAUsar = proveedoresDelAnio.length > 0 ? proveedoresDelAnio : proveedores;
+  
+  if (proveedoresDelAnio.length === 0 && proveedores.length > 0) {
+    console.warn(`⚠️ ALERTA PDF: Ningún proveedor está asociado a campamentos de ${currentYear}. Se mostrarán TODOS.`);
+  }
+
+  // Usamos el array filtrado (o el de respaldo) en lugar del original
+  const porProveedor = agruparIngredientesPorProveedor(todosIngredientes, proveedoresAUsar);
+  
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
   doc.text(campName, 14, currentY);
