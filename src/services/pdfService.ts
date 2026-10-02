@@ -3,9 +3,11 @@ import autoTable from 'jspdf-autotable';
 import type { Dish } from '@/data/dishes';
 import type { DayMenu } from '@/data/menu';
 import type { SectionCounts } from '@/data/sections';
+import { SECTIONS, effectiveMultiplier } from '@/data/sections';
 import type { Persona, TipoDieta } from '@/data/personas';
-import { totalPeople, SECTIONS, effectiveMultiplier } from '@/data/sections';
-import { agruparIngredientesPorProveedor, type Proveedor } from '@/data/proveedores';
+import { getTotalPersonasConDieta, esIncompatibleConDieta, getDietasCompatiblesDelPlato } from '@/data/personas';
+import type { Proveedor } from '@/data/proveedores';
+import { agruparIngredientesPorProveedor } from '@/data/proveedores';
 
 interface ConsolidatedItem {
   name: string;
@@ -13,117 +15,47 @@ interface ConsolidatedItem {
   unit: string;
 }
 
-// ─── LÓGICA DE DIETAS (Autónoma) ───
+// ─── LÓGICA DE DIETAS (Unificada y robusta) ───
 function getDietasCompatiblesDelPlato(dish: Dish): TipoDieta[] {
   const dietas: TipoDieta[] = [];
-  if (dish.diets?.includes('vegano')) dietas.push('Vegano');
-  if (dish.diets?.includes('vegetariano')) dietas.push('Vegetariano');
-  if (dish.diets?.includes('pescetariano')) dietas.push('Pescetariano');
+  const dietsLower = (dish.diets || []).map(d => String(d).toLowerCase().trim());
+  
+  if (dietsLower.includes('vegano')) dietas.push('Vegano');
+  if (dietsLower.includes('vegetariano')) dietas.push('Vegetariano');
+  if (dietsLower.includes('pescetariano')) dietas.push('Pescetariano');
   
   const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
   const tieneNoHalal = dish.ingredients?.some((ing) => noHalal.some((nh) => ing.name.toLowerCase().includes(nh)));
-  if (dish.diets?.includes('halal' as any) || (!tieneNoHalal && dish.name.toLowerCase().includes('halal'))) {
+  if (dietsLower.includes('halal') || (!tieneNoHalal && dish.name.toLowerCase().includes('halal'))) {
     dietas.push('Halal');
   }
   return dietas;
 }
 
-
-// ─── Lista exhaustiva de carnes y productos cárnicos ─────────
-const CARNES_Y_DERIVADOS = [
-  // Carnes frescas
-  'cerdo', 'pollo', 'vacuno', 'ternera', 'cordero', 'carne', 'buey', 'pavo', 'conejo', 'caballo', 'cabra',
-  // Cortes específicos
-  'solomillo', 'chuletón', 'entrecot', 'costilla', 'lomo', 'paletilla', 'falda', 'aguja', 'pescuezo',
-  // Embutidos y procesados
-  'jamon', 'jamón', 'serrano', 'ibérico', 'iberico', 'bacon', 'beicon', 'panceta', 'chorizo', 'salchichon', 'salchichón',
-  'salchicha', 'mortadela', 'fuet', 'lomo embuchado', 'cecina', 'mor cilla', 'morcilla', 'sobrasada', 'choped', 'paté', 'pate',
-  // Aves y caza
-  'pato', 'oca', 'codorniz', 'perdiz', 'faisán', 'faisan', 'venado', 'jabali', 'jabalí',
-  // Pescados y mariscos
-  'pescado', 'atun', 'atún', 'salmon', 'salmón', 'bacalao', 'merluza', 'sardina', 'boqueron', 'boquerón',
-  'gamba', 'langostino', 'mejillon', 'mejillón', 'calamar', 'pulpo', 'marisco', 'cangrejo', 'langosta', 'almeja',
-  // Caldos y extractos
-  'caldo de carne', 'caldo de pollo', 'extracto de carne', 'gelatina',
-  // Términos culinarios
-  'picada', 'picado', 'rehogado con carne', 'con carne', 'casero de carne',
-];
-
-function esIncompatibleConDieta(dish: Dish, dieta: TipoDieta): boolean {
-  const ingredientes = (dish.ingredients || []).map((ing) => ing.name.toLowerCase());
-  const nombrePlato = dish.name.toLowerCase();
-  const textoCompleto = [...ingredientes, nombrePlato].join(' ');
-    // Sin Gluten: NO puede comer trigo, cebada, centeno, avena ni derivados
-  if (dieta === 'Sin Gluten') {
-    const CON_GLUTEN = [
-      'gluten', 'trigo', 'centeno', 'cebada', 'avena', 'espelta', 'kamut', 'triticale',
-      'harina', 'pan', 'pasta', 'macarrones', 'espagueti', 'fideos', 'cuscus', 'cuscús', 'semolina',
-      'rebozado', 'empanado', 'croqueta', 'nugget', 'galleta', 'bollicao', 'brioche', 'tostada',
-      'soja texturizada', 'salsa de soja',
-    ];
-    return CON_GLUTEN.some((ing) => textoCompleto.includes(ing));
-  }
-
-  // Pescetariano: NO come carne, pero SÍ pescado/marisco
-  if (dieta === 'Pescetariano') {
-    const SOLO_CARNES = [
-      'cerdo', 'pollo', 'vacuno', 'ternera', 'cordero', 'buey', 'pavo', 'conejo', 'caballo', 'cabra',
-      'solomillo', 'chuletón', 'entrecot', 'costilla', 'lomo', 'paletilla', 'falda', 'aguja', 'pescuezo',
-      'jamon', 'jamón', 'serrano', 'ibérico', 'iberico', 'bacon', 'beicon', 'panceta', 'chorizo', 
-      'salchichon', 'salchichón', 'salchicha', 'mortadela', 'fuet', 'cecina', 'morcilla', 'sobrasada', 
-      'choped', 'paté', 'pate', 'pato', 'oca', 'codorniz', 'perdiz', 'faisán', 'faisan', 'venado', 
-      'jabali', 'jabalí', 'caldo de carne', 'caldo de pollo', 'extracto de carne',
-      'picada', 'picado', 'rehogado con carne', 'con carne',
-    ];
-    return SOLO_CARNES.some((carne) => textoCompleto.includes(carne));
-  }
-  if (dieta === 'Vegetariano' || dieta === 'Vegano') {
-    if (CARNES_Y_DERIVADOS.some((carne) => textoCompleto.includes(carne))) {
-      return true;
-    }
-    
-    if (dieta === 'Vegano') {
-      const productosAnimales = ['huevo', 'leche', 'queso', 'yogur', 'nata', 'mantequilla', 'miel'];
-      if (productosAnimales.some((prod) => textoCompleto.includes(prod))) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  if (dieta === 'Halal') {
-    const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'beicon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor', 'morcilla'];
-    return noHalal.some((ing) => textoCompleto.includes(ing));
-  }
-
-  return false;
-}
-
 function getPersonasEfectivasParaPlato(dish: Dish, counts: SectionCounts, personas: Persona[]): number {
-  const dietaDelPlato = getDietaDelPlato(dish);
+  const dietasDelPlato = getDietasCompatiblesDelPlato(dish);
   
-  if (dietaDelPlato) {
+  if (dietasDelPlato.length > 0) {
     let total = 0;
-    personas.forEach((p) => {
-      if (p.dieta === dietaDelPlato && p.seccion) {
-        const section = SECTIONS.find(s => s.id === p.seccion);
-        if (section) total += effectiveMultiplier(section);
-      }
+    dietasDelPlato.forEach(dieta => {
+      total += getTotalPersonasConDieta(counts, personas, dieta);
     });
     return total;
   } else {
+    // Plato General
     let totalGeneral = 0;
     SECTIONS.forEach((s) => {
-      const count = counts[s.id] || 0;
-      totalGeneral += count * effectiveMultiplier(s);
+      totalGeneral += (counts[s.id] || 0) * effectiveMultiplier(s);
     });
+    
+    // Restar personas con dietas o alergias incompatibles
     personas.forEach((p) => {
-      if (p.dieta !== 'General' && p.seccion) {
-        if (esIncompatibleConDieta(dish, p.dieta)) {
-          const section = SECTIONS.find(s => s.id === p.seccion);
-          if (section) totalGeneral -= effectiveMultiplier(section);
-        }
+      if (p.dieta !== 'General' && esIncompatibleConDieta(dish, p.dieta)) {
+        const section = SECTIONS.find(s => s.id === p.seccion);
+        if (section) totalGeneral -= effectiveMultiplier(section);
       }
+      // Nota: Para simplificar en PDF, nos centramos en dietas. Las alergias específicas 
+      // suelen gestionarse como raciones aparte, pero si quieres restarlas, avísame.
     });
     return Math.max(0, totalGeneral);
   }
@@ -184,7 +116,7 @@ export function generateDailyShoppingPDF(
 
   doc.setFontSize(11);
   doc.setTextColor(60, 60, 60);
-  doc.text(`Comensales totales registrados: ${totalPeople(counts)}`, 14, currentY);
+  doc.text(`Comensales totales registrados: ${Object.values(counts).reduce((a, b) => a + b, 0)}`, 14, currentY);
   currentY += 10;
 
   const meals = [
@@ -204,40 +136,28 @@ export function generateDailyShoppingPDF(
     doc.text(meal.label, 14, currentY);
     currentY += 5;
 
+    // Agrupar platos por su dieta principal para el PDF
     const grupos: Record<string, { platos: Dish[]; maxComensales: number }> = {};
-        mealDishes.forEach((dish) => {
+    mealDishes.forEach((dish) => {
       const dietas = getDietasCompatiblesDelPlato(dish);
-      const grupoKey = dietas.length > 0 ? dietas[0] : 'General'; // Usa la primera dieta para agrupar en el PDF
+      const grupoKey = dietas.length > 0 ? dietas[0] : 'General';
       
       if (!grupos[grupoKey]) grupos[grupoKey] = { platos: [], maxComensales: 0 };
       grupos[grupoKey].platos.push(dish);
       
-      // Sumar comensales de TODAS las dietas compatibles
-      let comensalesTotales = 0;
-      if (dietas.length > 0) {
-        dietas.forEach(dieta => {
-          comensalesTotales += getTotalPersonasConDieta(counts, personas, dieta);
-        });
-      } else {
-        // Lógica General
-        let totalGeneral = 0;
-        SECTIONS.forEach((s) => { totalGeneral += (counts[s.id] || 0) * effectiveMultiplier(s); });
-        personas.forEach((p) => {
-          if (p.dieta !== 'General' && esIncompatibleConDieta(dish, p.dieta)) {
-            const section = SECTIONS.find(s => s.id === p.seccion);
-            if (section) totalGeneral -= effectiveMultiplier(section);
-          }
-        });
-        comensalesTotales = Math.max(0, totalGeneral);
-      }
-      
-      if (comensalesTotales > grupos[grupoKey].maxComensales) {
-        grupos[grupoKey].maxComensales = comensalesTotales;
+      const comensales = getPersonasEfectivasParaPlato(dish, counts, personas);
+      if (comensales > grupos[grupoKey].maxComensales) {
+        grupos[grupoKey].maxComensales = comensales;
       }
     });
 
     Object.entries(grupos).forEach(([dieta, data]) => {
+      if (data.maxComensales === 0 && data.platos.length > 0) {
+        // Fallback si el cálculo da 0 pero hay platos
+        data.maxComensales = 1; 
+      }
       if (data.maxComensales === 0) return;
+      
       const ingredients = consolidateIngredients(data.platos, data.maxComensales);
       if (ingredients.length === 0) return;
 
@@ -256,7 +176,7 @@ export function generateDailyShoppingPDF(
         alternateRowStyles: { fillColor: [255, 247, 237] },
         styles: { fontSize: 9, cellPadding: 2 },
         columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 45, halign: 'right' }, 2: { cellWidth: 30, halign: 'center' } },
-        didDrawPage: (d) => { currentY = d.cursor.y + 5; },
+        didDrawPage: (d) => { currentY = (d as any).cursor.y + 5; },
       });
       currentY += 5;
     });
@@ -289,7 +209,7 @@ export function generateGlobalShoppingPDF(
 
   doc.setFontSize(11);
   doc.setTextColor(60, 60, 60);
-  doc.text(`Comensales base: ${totalPeople(counts)}`, 14, currentY);
+  doc.text(`Comensales base: ${Object.values(counts).reduce((a, b) => a + b, 0)}`, 14, currentY);
   currentY += 10;
 
   const globalGrupos: Record<string, { platos: Dish[]; maxComensales: number }> = {};
@@ -299,16 +219,23 @@ export function generateGlobalShoppingPDF(
     const dayDishes = allDishes.filter((d) => allMeals.includes(d.id) || allMeals.includes(d.name));
     
     dayDishes.forEach((dish) => {
-      const dieta = getDietaDelPlato(dish) || 'General';
+      const dietas = getDietasCompatiblesDelPlato(dish);
+      const grupoKey = dietas.length > 0 ? dietas[0] : 'General';
+      
+      if (!globalGrupos[grupoKey]) globalGrupos[grupoKey] = { platos: [], maxComensales: 0 };
+      globalGrupos[grupoKey].platos.push(dish);
+      
       const comensales = getPersonasEfectivasParaPlato(dish, counts, personas);
-      if (!globalGrupos[dieta]) globalGrupos[dieta] = { platos: [], maxComensales: 0 };
-      globalGrupos[dieta].platos.push(dish);
-      if (comensales > globalGrupos[dieta].maxComensales) globalGrupos[dieta].maxComensales = comensales;
+      if (comensales > globalGrupos[grupoKey].maxComensales) {
+        globalGrupos[grupoKey].maxComensales = comensales;
+      }
     });
   });
 
   Object.entries(globalGrupos).forEach(([dieta, data]) => {
+    if (data.maxComensales === 0 && data.platos.length > 0) data.maxComensales = 1;
     if (data.maxComensales === 0) return;
+    
     const ingredients = consolidateIngredients(data.platos, data.maxComensales);
     if (ingredients.length === 0) return;
 
@@ -328,7 +255,7 @@ export function generateGlobalShoppingPDF(
       headStyles: { fillColor: [234, 88, 12], textColor: 255, fontStyle: 'bold' },
       styles: { fontSize: 9, cellPadding: 2 },
       columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 50, halign: 'right' }, 2: { cellWidth: 30, halign: 'center' } },
-      didDrawPage: (d) => { currentY = d.cursor.y + 5; },
+      didDrawPage: (d) => { currentY = (d as any).cursor.y + 5; },
     });
     currentY += 5;
   });
@@ -417,7 +344,7 @@ export function generateCompraPorProveedorPDF(
       autoTable(doc, {
         startY: currentY,
         head: [['Ingrediente', 'Cantidad', 'Unidad']],
-                body: grupo.ingredientes.map((ing: any) => {
+        body: grupo.ingredientes.map((ing: any) => {
           let nombreMostrar = ing.nombre;
           if (ing.tambienEn && ing.tambienEn.length > 0) {
             nombreMostrar += ` (también en: ${ing.tambienEn.join(', ')})`;
@@ -429,7 +356,7 @@ export function generateCompraPorProveedorPDF(
         alternateRowStyles: { fillColor: [255, 247, 237] },
         styles: { fontSize: 9, cellPadding: 2 },
         columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 45, halign: 'right' }, 2: { cellWidth: 30, halign: 'center' } },
-        didDrawPage: (d) => { currentY = d.cursor.y + 5; },
+        didDrawPage: (d) => { currentY = (d as any).cursor.y + 5; },
       });
 
       currentY += 2;
@@ -441,7 +368,7 @@ export function generateCompraPorProveedorPDF(
     });
   }
 
-  const pageCount = (doc as any).lastAutoTable?.pageCount || 1;
+  const pageCount = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setFontSize(8);
