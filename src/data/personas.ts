@@ -207,7 +207,22 @@ const ALERGENO_A_PALABRAS: Record<string, string[]> = {
   'altramuces': ['altramuces', 'altramuz', 'lupino'],
   'moluscos': ['moluscos', 'mejillon', 'mejillón', 'almeja', 'calamar', 'pulpo', 'sepia'],
 };
-
+// Devuelve un array con TODAS las dietas para las que es apto el plato
+export function getDietasCompatiblesDelPlato(dish: Dish): TipoDieta[] {
+  const dietas: TipoDieta[] = [];
+  if (dish.diets?.includes('vegano')) dietas.push('Vegano');
+  if (dish.diets?.includes('vegetariano')) dietas.push('Vegetariano');
+  if (dish.diets?.includes('pescetariano')) dietas.push('Pescetariano');
+  
+  const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
+  const tieneNoHalal = dish.ingredients?.some((ing) =>
+    noHalal.some((nh) => ing.name.toLowerCase().includes(nh))
+  );
+  if (dish.diets?.includes('halal' as any) || (!tieneNoHalal && dish.name.toLowerCase().includes('halal'))) {
+    dietas.push('Halal');
+  }
+  return dietas;
+}
 // Detecta conflictos de alergias Y de dieta para un plato
 export function detectAllergenConflicts(dish: Dish, personas: Persona[]) {
   const conflictos: { persona: Persona; alergiasCoincidentes: string[]; tipo: 'alergia' | 'dieta' }[] = [];
