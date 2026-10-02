@@ -644,7 +644,7 @@ export default function App() {
                 onClick={() => {
                   const currentDayMenu = menuList.find((m) => m.day === selectedCampDay);
                   if (currentDayMenu) {
-                    generateCompraPorProveedorPDF(currentDayMenu, dishesList, counts, personasList, proveedoresList);
+                    generateCompraPorProveedorPDF(currentDayMenu, dishesList, counts, personasList, proveedoresList, campamentosList);
                   }
                 }}
                 className="flex items-center justify-center gap-1.5 bg-indigo-600 text-white rounded-xl px-3 py-2 text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm flex-1 sm:flex-initial"
