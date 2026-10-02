@@ -8,7 +8,7 @@ import type { Persona, TipoDieta } from '@/data/personas';
 import { getTotalPersonasConDieta, esIncompatibleConDieta, getDietasCompatiblesDelPlato } from '@/data/personas';
 import type { Proveedor } from '@/data/proveedores';
 import { agruparIngredientesPorProveedor } from '@/data/proveedores';
-
+import type { Campamento } from '@/data/campamentos';
 interface ConsolidatedItem {
   name: string;
   amount: number;
@@ -248,15 +248,49 @@ export function generateCompraPorProveedorPDF(
   counts: SectionCounts,
   personas: Persona[],
   proveedores: Proveedor[],
+  campamentos: Campamento[] = [],
   campName: string = 'Cocina La Milagrosa 143'
 ): void {
   console.log('🚀 [PDF] Iniciando generación de PDF Proveedores...');
-  console.log('📦 Proveedores recibidos:', proveedores.length);
+  console.log('📦 Proveedores totales recibidos:', proveedores.length);
+  console.log('🏕️ Campamentos totales recibidos:', campamentos.length);
 
   try {
     const doc = new jsPDF();
     let currentY = 20;
 
+    // ─── FILTRO: Solo proveedores asociados a campamentos del año en curso ───
+    const currentYear = new Date().getFullYear().toString(); // Ej: "2026"
+    
+    // 1. Buscar campamentos cuyo nombre incluya el año actual
+    const campamentosDelAnio = campamentos.filter((camp) => 
+      camp.nombre && String(camp.nombre).includes(currentYear)
+    );
+    
+    // 2. Extraer los UUIDs de esos campamentos
+    const uuidsCampamentosDelAnio = campamentosDelAnio.map((camp) => camp.id);
+    
+    console.log(`🔍 Filtro de proveedores: Año ${currentYear}`);
+    console.log(`📋 Campamentos del año:`, campamentosDelAnio.map(c => c.nombre));
+    console.log(`🆔 UUIDs válidos:`, uuidsCampamentosDelAnio);
+    
+    // 3. Filtrar proveedores que tengan al menos uno de esos UUIDs en su lista de campamentos
+    const proveedoresDelAnio = proveedores.filter((prov) => {
+      return prov.campamentos && prov.campamentos.some((campUUID) => 
+        uuidsCampamentosDelAnio.includes(campUUID)
+      );
+    });
+
+    console.log(`✅ Proveedores filtrados: ${proveedoresDelAnio.length} de ${proveedores.length}`);
+
+    // 🛡️ RESPALDO: Si el filtro oculta a todos, usamos todos los proveedores
+    const proveedoresAUsar = proveedoresDelAnio.length > 0 ? proveedoresDelAnio : proveedores;
+    
+    if (proveedoresDelAnio.length === 0 && proveedores.length > 0) {
+      console.warn(`⚠️ ALERTA: Ningún proveedor está asociado a campamentos de ${currentYear}. Se mostrarán TODOS.`);
+    }
+
+    // ─── Recopilar ingredientes del día ───
     const todosIngredientes: { nombre: string; cantidad: number; unidad: string }[] = [];
     const meals: ('desayuno' | 'comida' | 'merienda' | 'cena')[] = ['desayuno', 'comida', 'merienda', 'cena'];
 
@@ -274,9 +308,11 @@ export function generateCompraPorProveedorPDF(
 
     console.log('🥕 Total ingredientes recopilados:', todosIngredientes.length);
 
-    const porProveedor = agruparIngredientesPorProveedor(todosIngredientes, proveedores);
+    // ─── Agrupar ingredientes por proveedor (usando los filtrados) ───
+    const porProveedor = agruparIngredientesPorProveedor(todosIngredientes, proveedoresAUsar);
     console.log('🏪 Proveedores agrupados con éxito:', porProveedor.length);
 
+    // ─── Generar el PDF ───
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.text(campName, 14, currentY);
