@@ -483,5 +483,15 @@ export function generateCompraPorProveedorPDF(
     doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
   }
 
+    // Pie de página
+  const pageCount = (doc as any).internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`${campName} — ${new Date().toLocaleDateString('es-ES')}`, 14, doc.internal.pageSize.height - 10);
+    doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
+  }
+
   doc.save(`Compra_Proveedores_Dia_${dayMenu.day}.pdf`);
 }
