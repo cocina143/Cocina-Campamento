@@ -17,6 +17,7 @@ interface ConsolidatedItem {
 function getDietaDelPlato(dish: Dish): TipoDieta | null {
   if (dish.diets?.includes('vegano')) return 'Vegano';
   if (dish.diets?.includes('vegetariano')) return 'Vegetariano';
+  if (dish.diets?.includes('pescetariano')) return 'Pescetariano';
   
   const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
   const tieneNoHalal = dish.ingredients?.some((ing) =>
@@ -27,6 +28,7 @@ function getDietaDelPlato(dish: Dish): TipoDieta | null {
     return 'Halal';
   }
   return null;
+}
 }
 
 // ─── Lista exhaustiva de carnes y productos cárnicos ─────────
