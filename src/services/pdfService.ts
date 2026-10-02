@@ -291,13 +291,12 @@ export function generateCompraPorProveedorPDF(
     });
   });
 
-  // ─── NUEVO: Filtrar proveedores por el año en curso ───
+    // ─── FILTRO: Solo proveedores activos en el año en curso ───
   const currentYear = new Date().getFullYear().toString(); // Ej: "2026"
   
   const proveedoresDelAnio = proveedores.filter((prov) => {
-    // Incluye al proveedor si su campo 'fecha' existe y contiene el año actual
-    // (Funciona tanto si la fecha es "2026" como si es "2026-01-01")
-    return prov.fecha && String(prov.fecha).includes(currentYear);
+    // Verifica si el proveedor tiene campamentos asignados y si alguno incluye el año actual
+    return prov.campamentos && prov.campamentos.some((camp) => String(camp).includes(currentYear));
   });
 
   // Usamos el array filtrado en lugar del original
