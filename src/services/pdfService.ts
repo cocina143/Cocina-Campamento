@@ -14,20 +14,18 @@ interface ConsolidatedItem {
 }
 
 // ─── LÓGICA DE DIETAS (Autónoma) ───
-function getDietaDelPlato(dish: Dish): TipoDieta | null {
-  if (dish.diets?.includes('vegano')) return 'Vegano';
-  if (dish.diets?.includes('vegetariano')) return 'Vegetariano';
-  if (dish.diets?.includes('pescetariano')) return 'Pescetariano';
+function getDietasCompatiblesDelPlato(dish: Dish): TipoDieta[] {
+  const dietas: TipoDieta[] = [];
+  if (dish.diets?.includes('vegano')) dietas.push('Vegano');
+  if (dish.diets?.includes('vegetariano')) dietas.push('Vegetariano');
+  if (dish.diets?.includes('pescetariano')) dietas.push('Pescetariano');
   
   const noHalal = ['cerdo', 'jamon', 'jamón', 'bacon', 'vino', 'alcohol', 'cerveza', 'ron', 'licor'];
-  const tieneNoHalal = dish.ingredients?.some((ing) =>
-    noHalal.some((nh) => ing.name.toLowerCase().includes(nh))
-  );
-  
-  if (!tieneNoHalal && (dish.name.toLowerCase().includes('halal') || dish.diets?.includes('halal' as any))) {
-    return 'Halal';
+  const tieneNoHalal = dish.ingredients?.some((ing) => noHalal.some((nh) => ing.name.toLowerCase().includes(nh)));
+  if (dish.diets?.includes('halal' as any) || (!tieneNoHalal && dish.name.toLowerCase().includes('halal'))) {
+    dietas.push('Halal');
   }
-  return null;
+  return dietas;
 }
 
 
@@ -207,12 +205,35 @@ export function generateDailyShoppingPDF(
     currentY += 5;
 
     const grupos: Record<string, { platos: Dish[]; maxComensales: number }> = {};
-    mealDishes.forEach((dish) => {
-      const dieta = getDietaDelPlato(dish) || 'General';
-      const comensales = getPersonasEfectivasParaPlato(dish, counts, personas);
-      if (!grupos[dieta]) grupos[dieta] = { platos: [], maxComensales: 0 };
-      grupos[dieta].platos.push(dish);
-      if (comensales > grupos[dieta].maxComensales) grupos[dieta].maxComensales = comensales;
+        mealDishes.forEach((dish) => {
+      const dietas = getDietasCompatiblesDelPlato(dish);
+      const grupoKey = dietas.length > 0 ? dietas[0] : 'General'; // Usa la primera dieta para agrupar en el PDF
+      
+      if (!grupos[grupoKey]) grupos[grupoKey] = { platos: [], maxComensales: 0 };
+      grupos[grupoKey].platos.push(dish);
+      
+      // Sumar comensales de TODAS las dietas compatibles
+      let comensalesTotales = 0;
+      if (dietas.length > 0) {
+        dietas.forEach(dieta => {
+          comensalesTotales += getTotalPersonasConDieta(counts, personas, dieta);
+        });
+      } else {
+        // Lógica General
+        let totalGeneral = 0;
+        SECTIONS.forEach((s) => { totalGeneral += (counts[s.id] || 0) * effectiveMultiplier(s); });
+        personas.forEach((p) => {
+          if (p.dieta !== 'General' && esIncompatibleConDieta(dish, p.dieta)) {
+            const section = SECTIONS.find(s => s.id === p.seccion);
+            if (section) totalGeneral -= effectiveMultiplier(section);
+          }
+        });
+        comensalesTotales = Math.max(0, totalGeneral);
+      }
+      
+      if (comensalesTotales > grupos[grupoKey].maxComensales) {
+        grupos[grupoKey].maxComensales = comensalesTotales;
+      }
     });
 
     Object.entries(grupos).forEach(([dieta, data]) => {
