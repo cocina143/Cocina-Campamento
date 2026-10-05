@@ -70,19 +70,20 @@ export function MenuPlannerModal({ menu, dishes, onSaveMenu, onClose }: MenuPlan
           </button>
         </div>
 
-        {/* Selector de Día (1 al 15) */}
-        <div className="flex gap-2 overflow-x-auto py-4 border-b border-stone-100 no-scrollbar">
+         {/* Selector de Día (1 al 15) - Grid responsive */}
+        <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-15 gap-2 py-4 border-b border-stone-100">
           {localMenu.map((m, idx) => (
             <button
               key={m.day}
               onClick={() => setSelectedDayIndex(idx)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+              title={`Día ${m.day}`}
+              className={`px-2 py-2 rounded-xl text-sm font-bold transition-all ${
                 selectedDayIndex === idx
                   ? 'bg-orange-600 text-white shadow-md shadow-orange-600/30'
                   : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
               }`}
             >
-              Día {m.day}
+              {m.day}
             </button>
           ))}
         </div>
