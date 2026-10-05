@@ -99,6 +99,7 @@ export default function App() {
   const [proveedoresList, setProveedoresList] = useState<Proveedor[]>([]);
   const [showProveedores, setShowProveedores] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
+  const [showRecipeGuide, setShowRecipeGuide] = useState(false);
   const [campamentosList, setCampamentosList] = useState<Campamento[]>([]);
   const [checkedIngredients, setCheckedIngredients] = useState<Set<string>>(() => {
     try {
@@ -641,8 +642,16 @@ export default function App() {
                 <FileDown className="w-3.5 h-3.5" />
                 <span>PDF Día</span>
               </button>
+              {/* Botón Recetas del Día */}
+              <button
+                onClick={() => setShowRecipeGuide(true)}
+                className="flex items-center justify-center gap-1.5 bg-amber-600 text-white rounded-xl px-3 py-2 text-xs font-bold hover:bg-amber-700 transition-all shadow-sm flex-1 sm:flex-initial"
+              >
+                <ChefHat className="w-3.5 h-3.5" />
+                <span>Recetas del Día</span>
+              </button>
                                           
-                              {/* Botón PDF por Proveedor */}
+              {/* Botón PDF por Proveedor */}
               <button
                 onClick={() => {
                   const currentDayMenu = menuList.find((m) => m.day === selectedCampDay);
@@ -957,6 +966,13 @@ export default function App() {
           onToggleIngredient={toggleIngredient}
           onClose={() => setSelectedDish(null)}
           personas={personasList}
+        />
+      )}
+            {showRecipeGuide && menuList.find((m) => m.day === selectedCampDay) && (
+        <RecipeGuideModal
+          dayMenu={menuList.find((m) => m.day === selectedCampDay)!}
+          allDishes={dishesList}
+          onClose={() => setShowRecipeGuide(false)}
         />
       )}
     </div>
