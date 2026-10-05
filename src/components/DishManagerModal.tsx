@@ -190,7 +190,18 @@ export function DishManagerModal({ dishes, onSaveDishes, onClose }: DishManagerM
                 ))}
               </div>
             </div>
-
+            {/* Guion de Elaboración */}
+            <div>
+              <label className="text-xs font-bold text-stone-600 block mb-1">📝 Guion de Elaboración</label>
+              <textarea
+                value={editingDish.elaboracion || ''}
+                onChange={(e) => setEditingDish({ ...editingDish, elaboracion: e.target.value })}
+                placeholder={"Paso 1: Lavar y cortar las verduras...\n\nPaso 2: Sofreír la cebolla...\n\nPaso 3: Incorporar el resto de ingredientes..."}
+                className="w-full border border-stone-300 rounded-xl p-3 text-sm resize-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200 transition-all"
+                rows={8}
+              />
+              <p className="text-[10px] text-stone-500 mt-1">Escribe los pasos de preparación. Usa Enter para saltos de línea.</p>
+            </div>
             <div className="flex gap-2 pt-4">
               <button type="button" onClick={handleSaveCurrentDish} disabled={isSearchingImage} className="flex-1 bg-orange-600 text-white font-bold py-2.5 rounded-xl hover:bg-orange-700 transition-all disabled:opacity-50">
                 {isSearchingImage && <Loader2 className="w-4 h-4 animate-spin inline mr-2" />} Guardar este plato
