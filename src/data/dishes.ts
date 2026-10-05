@@ -93,7 +93,7 @@ export const INITIAL_DISHES: Dish[] = [
 export async function getDishesFromSupabase(): Promise<Dish[]> {
   const { data, error } = await supabase
     .from('dishes')
-    .select('id, name, category, image, ingredients, allergens, diets')
+    .select('id, name, category, image, ingredients, allergens, diets, elaboracion') // <-- AÑADIDO 'elaboracion'
     .order('name');
 
   if (error || !data) {
@@ -101,7 +101,7 @@ export async function getDishesFromSupabase(): Promise<Dish[]> {
     return INITIAL_DISHES; // Fallback seguro
   }
 
-    return data.map((d: any) => ({
+  return data.map((d: any) => ({
     id: String(d.id),
     name: String(d.name),
     category: d.category === 'Especial' ? 'Especial' : 'Plato principal',
@@ -120,9 +120,9 @@ export async function getDishesFromSupabase(): Promise<Dish[]> {
     diets: Array.isArray(d.diets) 
       ? d.diets.map((d: string) => String(d).toLowerCase().trim()) 
       : [],
+    elaboracion: String(d.elaboracion || ''), // <-- AÑADIDO mapeo de elaboracion
   }));
 }
-
 // 2. GUARDAR / ACTUALIZAR UN PLATO
 export async function saveDishToSupabase(dish: Dish): Promise<void> {
   const formattedIngredients = (dish.ingredients || [])
