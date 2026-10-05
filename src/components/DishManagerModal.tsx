@@ -190,7 +190,7 @@ export function DishManagerModal({ dishes, onSaveDishes, onClose }: DishManagerM
                 ))}
               </div>
             </div>
-            {/* Guion de Elaboración */}
+            {/* Guión de Elaboración */}
             <div>
               <label className="text-xs font-bold text-stone-600 block mb-1">📝 Guion de Elaboración</label>
               <textarea
