@@ -189,7 +189,7 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
           {dish.elaboracion && dish.elaboracion.trim() !== '' && (
             <div>
               <h3 className="text-sm font-bold text-stone-500 uppercase tracking-wider mb-3">
-                📝 Guion de Elaboración
+                📝 Guión de Elaboración
               </h3>
               <div className="bg-stone-50 rounded-xl p-4 border border-stone-100">
                 <p className="text-sm text-stone-700 whitespace-pre-line leading-relaxed">
