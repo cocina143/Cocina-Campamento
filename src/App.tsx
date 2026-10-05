@@ -13,6 +13,7 @@ import { DishManagerModal } from '@/components/DishManagerModal';
 import { MenuPlannerModal } from '@/components/MenuPlannerModal';
 import { Header } from '@/components/Header';
 import { SectionPanel } from '@/components/SectionPanel';
+import { RecipeGuideModal } from '@/components/RecipeGuideModal';
 import { generateDailyShoppingPDF, generateGlobalShoppingPDF, generateCompraPorProveedorPDF } from '@/services/pdfService';
 import { getPersonasFromSupabase, savePersonaToSupabase, detectAllergenConflicts, type Persona, type TipoDieta } from '@/data/personas';
 import { PeopleManagerModal } from '@/components/PeopleManagerModal';
