@@ -36,6 +36,7 @@ export interface Dish {
   ingredients: Ingredient[];
   allergens?: AllergenId[];
   diets?: DietId[];
+  elaboracion?: string;
 }
 
 export const INITIAL_DISHES: Dish[] = [
@@ -142,6 +143,7 @@ export async function saveDishToSupabase(dish: Dish): Promise<void> {
       ingredients: formattedIngredients,
       allergens: dish.allergens || [],
       diets: dish.diets || [],
+      elaboracion: dish.elaboracion || '',
       updated_at: new Date().toISOString(),
     });
 
