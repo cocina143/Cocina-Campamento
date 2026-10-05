@@ -259,13 +259,20 @@ export function generateCompraPorProveedorPDF(
     const doc = new jsPDF();
     let currentY = 20;
 
-    // ─── FILTRO: Solo proveedores asociados a campamentos del año en curso ───
-    const currentYear = new Date().getFullYear().toString(); // Ej: "2026"
+        // ─── FILTRO: Solo proveedores asociados a campamentos del año en curso ───
+    const currentYear = new Date().getFullYear(); // Ej: 2026 (número, no string)
     
-    // 1. Buscar campamentos cuyo nombre incluya el año actual
+    // 1. Buscar campamentos cuyo campo 'anio' coincida con el año actual
     const campamentosDelAnio = campamentos.filter((camp) => 
-      camp.nombre && String(camp.nombre).includes(currentYear)
+      camp.anio === currentYear
     );
+    
+    // 2. Extraer los UUIDs de esos campamentos
+    const uuidsCampamentosDelAnio = campamentosDelAnio.map((camp) => camp.id);
+    
+    console.log(`🔍 Filtro de proveedores: Año ${currentYear}`);
+    console.log(`📋 Campamentos del año:`, campamentosDelAnio.map(c => `${c.nombre} (${c.anio})`));
+    console.log(`🆔 UUIDs válidos:`, uuidsCampamentosDelAnio);
     
     // 2. Extraer los UUIDs de esos campamentos
     const uuidsCampamentosDelAnio = campamentosDelAnio.map((camp) => camp.id);
