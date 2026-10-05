@@ -70,22 +70,45 @@ export function MenuPlannerModal({ menu, dishes, onSaveMenu, onClose }: MenuPlan
           </button>
         </div>
 
-         {/* Selector de Día (1 al 15) - Grid responsive */}
-        <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-15 gap-2 py-4 border-b border-stone-100">
-          {localMenu.map((m, idx) => (
-            <button
-              key={m.day}
-              onClick={() => setSelectedDayIndex(idx)}
-              title={`Día ${m.day}`}
-              className={`px-2 py-2 rounded-xl text-sm font-bold transition-all ${
-                selectedDayIndex === idx
-                  ? 'bg-orange-600 text-white shadow-md shadow-orange-600/30'
-                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-              }`}
+                {/* Selector de Día (1 al 15) - Híbrido: Dropdown en móvil, Grid en PC */}
+        <div className="py-4 border-b border-stone-100">
+          
+          {/* 📱 VISTA MÓVIL: Desplegable nativo (claro y fácil de tocar) */}
+          <div className="sm:hidden mb-3">
+            <label className="text-xs font-bold text-stone-500 mb-1 block uppercase tracking-wider">
+              Seleccionar Día
+            </label>
+            <select
+              value={selectedDayIndex}
+              onChange={(e) => setSelectedDayIndex(Number(e.target.value))}
+              className="w-full bg-white border border-stone-300 rounded-xl p-3 text-base font-bold text-stone-800 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 shadow-sm"
             >
-              {m.day}
-            </button>
-          ))}
+              {localMenu.map((m, idx) => (
+                <option key={m.day} value={idx}>
+                  Día {m.day}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 💻 VISTA TABLET/PC: Cuadrícula de botones */}
+          <div className="hidden sm:grid sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-2">
+            {localMenu.map((m, idx) => (
+              <button
+                key={m.day}
+                onClick={() => setSelectedDayIndex(idx)}
+                title={`Día ${m.day}`}
+                className={`px-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                  selectedDayIndex === idx
+                    ? 'bg-orange-600 text-white shadow-md shadow-orange-600/30'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+              >
+                {m.day}
+              </button>
+            ))}
+          </div>
+          
         </div>
 
         {/* Formulario de Edición por Comida */}
