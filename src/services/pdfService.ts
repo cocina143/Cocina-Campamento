@@ -259,13 +259,11 @@ export function generateCompraPorProveedorPDF(
     const doc = new jsPDF();
     let currentY = 20;
 
-        // ─── FILTRO: Solo proveedores asociados a campamentos del año en curso ───
-    const currentYear = new Date().getFullYear(); // Ej: 2026 (número, no string)
+    // ─── FILTRO: Solo proveedores asociados a campamentos del año en curso ───
+    const currentYear = new Date().getFullYear(); // Ej: 2026 (número)
     
     // 1. Buscar campamentos cuyo campo 'anio' coincida con el año actual
-    const campamentosDelAnio = campamentos.filter((camp) => 
-      camp.anio === currentYear
-    );
+    const campamentosDelAnio = campamentos.filter((camp) => camp.anio === currentYear);
     
     // 2. Extraer los UUIDs de esos campamentos
     const uuidsCampamentosDelAnio = campamentosDelAnio.map((camp) => camp.id);
@@ -274,18 +272,9 @@ export function generateCompraPorProveedorPDF(
     console.log(`📋 Campamentos del año:`, campamentosDelAnio.map(c => `${c.nombre} (${c.anio})`));
     console.log(`🆔 UUIDs válidos:`, uuidsCampamentosDelAnio);
     
-    // 2. Extraer los UUIDs de esos campamentos
-    const uuidsCampamentosDelAnio = campamentosDelAnio.map((camp) => camp.id);
-    
-    console.log(`🔍 Filtro de proveedores: Año ${currentYear}`);
-    console.log(`📋 Campamentos del año:`, campamentosDelAnio.map(c => c.nombre));
-    console.log(`🆔 UUIDs válidos:`, uuidsCampamentosDelAnio);
-    
-    // 3. Filtrar proveedores que tengan al menos uno de esos UUIDs en su lista de campamentos
+    // 3. Filtrar proveedores que tengan al menos uno de esos UUIDs
     const proveedoresDelAnio = proveedores.filter((prov) => {
-      return prov.campamentos && prov.campamentos.some((campUUID) => 
-        uuidsCampamentosDelAnio.includes(campUUID)
-      );
+      return prov.campamentos && prov.campamentos.some((campUUID) => uuidsCampamentosDelAnio.includes(campUUID));
     });
 
     console.log(`✅ Proveedores filtrados: ${proveedoresDelAnio.length} de ${proveedores.length}`);
