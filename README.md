@@ -23,7 +23,25 @@ Una herramienta pensada por y para jefes de cocina que necesitan organizar menú
 - 🔌 **Modo offline** gracias a PWA
 
 ---
+## 📋 Requisitos previos (todo gratuito)
 
+Antes de empezar, necesitas tener (o crear) estas dos cuentas gratuitas:
+
+1. **Cuenta en GitHub** → [github.com/signup](https://github.com/signup)
+   - Es la plataforma donde está el código de la aplicación.
+   - Si no tienes cuenta, créala en 1 minuto con tu email.
+
+2. **Cuenta en Vercel** → Se crea automáticamente con tu cuenta de GitHub
+   - No necesitas registrarte aparte: cuando pulses el botón "Deploy with Vercel", te pedirá iniciar sesión con GitHub y listo.
+   - Vercel es la plataforma que aloja tu aplicación web (gratis para proyectos personales).
+
+3. **Cuenta en Supabase** → [supabase.com](https://supabase.com)
+   - Es la base de datos donde se guardarán tus platos, menús, proveedores, etc.
+   - Plan gratuito más que suficiente para un grupo Scout.
+
+> 💡 **Tranquilo/a**: Todo el proceso es 100% gratuito y no necesitas saber programar. Solo seguir los 2 pasos de abajo.
+
+---
 ## 🚀 Despliega tu propia copia (5 minutos)
 
 Cada grupo Scout tendrá **su propia aplicación** con **sus propios datos** (platos, menús, proveedores, personas). Totalmente independiente y gratuito.
@@ -46,16 +64,30 @@ Pulsa este botón 👇
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/cocina143/Cocina-Campamento)
 
-Te pedirá:
-1. Iniciar sesión con GitHub (si no lo has hecho).
-2. Darle un nombre al proyecto (ej: `cocina-aguilas`).
-3. Rellenar las **variables de entorno** con los datos del Paso 1:
-   - `VITE_SUPABASE_URL` → pega tu Project URL
-   - `VITE_SUPABASE_ANON_KEY` → pega tu anon public key
-4. Pulsa **Deploy** y espera 1-2 minutos.
+**¿Qué va a pasar?**
 
-¡Listo! Te dará una URL tipo `https://cocina-aguilas.vercel.app` que podrás añadir a la pantalla de inicio del móvil como si fuera una app nativa. 📱
+1. Te llevará a Vercel. Si es la primera vez, te pedirá **iniciar sesión con tu cuenta de GitHub** (no necesitas crear una cuenta nueva en Vercel, se usa la de GitHub).
+2. Te pedirá **autorizar a Vercel** para acceder a tus repositorios. Acepta.
+3. Verás una pantalla de configuración. **No cambies nada**, solo baja hasta la sección **"Environment Variables"** (Variables de Entorno).
+4. Añade estas 2 variables con los datos que copiaste en el Paso 1:
 
+   | Clave | Valor |
+   |-------|-------|
+   | `VITE_SUPABASE_URL` | Pega aquí tu **Project URL** de Supabase |
+   | `VITE_SUPABASE_ANON_KEY` | Pega aquí tu **anon public key** de Supabase |
+
+5. Pulsa el botón azul **"Deploy"**.
+6. Espera 1-2 minutos mientras Vercel construye tu aplicación.
+
+**¡Listo!** 🎉
+
+Vercel te dará una URL tipo `https://cocina-aguilas.vercel.app`. Esa es la dirección de **tu propia aplicación**, totalmente independiente y con tus propios datos.
+
+> 📱 **Consejo**: Abre esa URL en el móvil, pulsa el menú del navegador y selecciona **"Añadir a pantalla de inicio"**. La app se instalará como si fuera una aplicación nativa, a pantalla completa y sin barra de navegador.
+
+Vercel te dará una URL tipo `https://cocina-aguilas.vercel.app`. Esa es la dirección de **tu propia aplicación**, totalmente independiente y con tus propios datos.
+
+> 📱 **Consejo**: Abre esa URL en el móvil, pulsa el menú del navegador y selecciona **"Añadir a pantalla de inicio"**. La app se instalará como si fuera una aplicación nativa, a pantalla completa y sin barra de navegador.
 ---
 
 ## 📖 Guía de uso rápido
@@ -92,7 +124,30 @@ Puedes abrir un *issue* o enviar un *pull request* al repositorio original.
 MIT License - Libre uso, modificación y distribución.
 
 ---
+---
 
+## ❓ Preguntas frecuentes
+
+**¿Es realmente gratis?**
+Sí, 100%. Tanto Supabase como Vercel tienen planes gratuitos que cubren de sobra el uso de un grupo Scout.
+
+**¿Necesito saber programar?**
+No. Solo tienes que seguir los 2 pasos de la guía. Si sabes copiar y pegar, puedes hacerlo.
+
+**¿Puedo personalizar la app con el nombre de mi grupo?**
+Sí. Una vez desplegada, puedes cambiar el nombre "Cocina La Milagrosa 143" por el de tu grupo en el archivo `src/App.tsx` (búscalo y cambia la cadena de texto). Vercel detectará el cambio y actualizará la app automáticamente en 1 minuto.
+
+**¿Qué pasa si quiero añadir una funcionalidad nueva?**
+Si tienes conocimientos técnicos, puedes hacer un *fork* del repositorio, modificar el código y desplegar tu versión. Si no, puedes pedir ayuda en la sección de *Issues* de GitHub o contactar con nosotros.
+
+**¿Mis datos están seguros?**
+Sí. Los datos se guardan en Supabase, que usa servidores europeos y cumple con el RGPD. Además, cada grupo tiene su propia base de datos, totalmente independiente.
+
+**¿Puedo usar la app sin conexión a internet?**
+Sí, una vez cargada la primera vez, la app funciona en modo offline gracias a la tecnología PWA. Ideal para campamentos en zonas sin cobertura.
+
+**¿Puedo exportar los datos?**
+Sí. La app genera PDFs con las listas de compra, menús y recetas. Puedes imprimirlos o guardarlos.
 ## 💬 Contacto
 
 ¿Dudas, sugerencias o quieres compartir cómo te va con la app? Abre un *issue* en GitHub.
