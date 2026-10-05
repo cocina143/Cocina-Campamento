@@ -47,7 +47,6 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
   let tituloDieta: string = 'GENERAL';
 
   if (dietasDelPlato.length > 0) {
-    // Sumar personas de TODAS las dietas compatibles
     const seccionesMap = new Map<string, { sectionName: string; count: number; effectiveCount: number }>();
     
     dietasDelPlato.forEach(dieta => {
@@ -73,7 +72,6 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
 
     tituloDieta = `${dietasDelPlato.join(' / ').toUpperCase()} (${totalEfectivo.toFixed(1)} raciones)`;
   } else {
-    // Plato General: calcular para todos MENOS los que no pueden comerlo
     desglose = SECTIONS.map((s) => {
       const totalSeccion = counts[s.id] || 0;
       const personasDeSeccion = personas.filter((p) => p.seccion === s.id);
@@ -126,6 +124,7 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
         )}
 
         <div className="p-4 sm:p-6 space-y-6">
+          {/* Sección de Ingredientes */}
           <div>
             <h3 className="text-sm font-bold text-stone-500 uppercase tracking-wider mb-3 flex items-center gap-2 flex-wrap">
               Ingredientes y Cantidades
@@ -185,6 +184,20 @@ export function DishModal({ dish, counts, checkedIngredients, onToggleIngredient
               })}
             </div>
           </div>
+
+          {/* Sección de Guion de Elaboración */}
+          {dish.elaboracion && dish.elaboracion.trim() !== '' && (
+            <div>
+              <h3 className="text-sm font-bold text-stone-500 uppercase tracking-wider mb-3">
+                📝 Guion de Elaboración
+              </h3>
+              <div className="bg-stone-50 rounded-xl p-4 border border-stone-100">
+                <p className="text-sm text-stone-700 whitespace-pre-line leading-relaxed">
+                  {dish.elaboracion}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
