@@ -190,9 +190,9 @@ export function DishManagerModal({ dishes, onSaveDishes, onClose }: DishManagerM
                 ))}
               </div>
             </div>
-            {/* Guión de Elaboración */}
+            {/* Guion de Elaboración */}
             <div>
-              <label className="text-xs font-bold text-stone-600 block mb-1">📝 Guion de Elaboración</label>
+              <label className="text-xs font-bold text-stone-600 block mb-1">📝 Guión de Elaboración</label>
               <textarea
                 value={editingDish.elaboracion || ''}
                 onChange={(e) => setEditingDish({ ...editingDish, elaboracion: e.target.value })}
