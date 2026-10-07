@@ -29,7 +29,7 @@ import {
   Wifi, WifiOff, FileDown, ShoppingBag, Coffee, Sun, Apple, Moon, AlertTriangle 
 } from 'lucide-react';
 
-type FilterCategory = 'General' | 'Halal' | 'Vegetariano' | 'Pescetariano' | 'Sin Gluten' | 'Con Guión';
+type FilterCategory = 'General' | 'Halal' | 'Vegetariano' | 'Pescetariano' | 'Sin Gluten';
 
 const STORAGE_KEY = 'cocina-campamento-counts';
 const DATE_KEY = 'cocina-campamento-date';
@@ -474,7 +474,7 @@ export default function App() {
   (filter === 'Pescetariano' && dish.diets?.includes('pescetariano')) ||
   (filter === 'Halal' && !dish.ingredients?.some((ing) => /cerdo|jamón|jamon|bacon|beicon|alcohol|vino|cerveza|mor cilla|morcilla/i.test(ing.name))) ||
   (filter === 'Sin Gluten' && !dish.ingredients?.some((ing) => /gluten|trigo|centeno|cebada|avena|harina|pan|pasta|macarrones|cuscus|rebozado|empanado/i.test(ing.name)) && !dish.allergens?.includes('gluten'));
-  (filter === 'Con Guión' && dish.elaboracion && dish.elaboracion.trim() !== '');    
+      
         return isPlanned && matchesCategory;
       });
       return { key, label, icon, dishes };
@@ -686,7 +686,7 @@ export default function App() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {(['General', 'Halal', 'Vegetariano', 'Pescetariano', 'Sin Gluten', 'Con Guión'] as FilterCategory[]).map((cat) => (
+              {(['General', 'Halal', 'Vegetariano', 'Pescetariano', 'Sin Gluten'] as FilterCategory[]).map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setFilter(cat)}
